@@ -24,6 +24,7 @@ const LINE_TYPES = {
   'x': 'x-coordinates',
   'y': 'y-coordinates',
   'θ': 'polar',
+  '~': 'approximation'
 };
 const LINE_DESCRIPTIONS = {
   'a': `Add coords of given lines together`,
@@ -38,6 +39,7 @@ const LINE_DESCRIPTIONS = {
   'x': 'x-coordinates are controlled and passed to function which returns y-coordinate',
   'y': 'y-coordinates are controlled and passed to function which returns x-coordinate',
   'θ': 'Polar: θ is an angle in radians with the polar point [fn(θ), θ] being plotted.',
+  '~': 'Approximate function around a point using the Taylor series',
 };
 
 //#region CONFIG POPUP
@@ -321,6 +323,47 @@ function generateNewLinePopup(callback, lineData = undefined) {
           }
         });
         el.appendChild(inputCond);
+        break;
+      }
+      case '~': {
+        div.insertAdjacentHTML("beforeend", "<p>&#402;(&xscr;) &#8776; &#402;(&ascr;) + &#402;'(&ascr;)(&xscr;-&ascr;) + (&#402;''(&ascr;)/2!)(&xscr;-&ascr;)<sup>2</sup> + ... + (&#402;<sup>(&nscr;)</sup>(&ascr;)/&nscr;!)(&xscr;-&ascr;)<sup>&nscr;</sup></p>");
+        div.insertAdjacentHTML("beforeend", `<p>Current Approx: <input type='text' value="${line.fnRaw ?? ''}" /></p>`);
+        let el = document.createElement("p");
+        el.innerHTML = `ID of line to approximate: `;
+        let selectID = document.createElement("select");
+        selectID.insertAdjacentHTML("beforeend", "<option selected disabled>ID</option>");
+        g.getLines().forEach(id => selectID.insertAdjacentHTML('beforeend', `<option ${id}>${id}</option>`));
+        if (line.id === undefined) line.id = NaN; else selectID.value = line.id;
+        selectID.addEventListener("change", () => line.id = +selectID.value);
+        el.appendChild(selectID);
+        div.appendChild(el);
+        el = document.createElement("p");
+        el.insertAdjacentHTML("beforeend", "<abbr title='Value of highest x term'>Approx. Degree</abbr> &nscr; = ");
+        let inputN = document.createElement("input");
+        inputN.type = "number";
+        inputN.min = "0";
+        inputN.max = "100";
+        line.degree ??= 3;
+        inputN.value = line.degree;
+        inputN.addEventListener("change", () => {
+          let n = +inputN.value;
+          if (n < 0 || isNaN(n)) n = 1;
+          line.degree = n;
+        });
+        el.appendChild(inputN);
+        div.appendChild(el);
+        el = document.createElement("p");
+        el.insertAdjacentHTML("beforeend", "<abbr title='Value to approximate function at'>&ascr;</abbr> = ");
+        let inputA = document.createElement("input");
+        inputA.type = "number";
+        line.C ??= 0;
+        inputA.value = line.C;
+        inputA.addEventListener("change", () => {
+          let a = +inputA.value;
+          line.C = a;
+        });
+        el.appendChild(inputA);
+        div.appendChild(el);
         break;
       }
       case 'e': {
@@ -1395,6 +1438,22 @@ function updateTable() {
       addLine({ type: 'i', id });
       newCache = true;
       update = true;
+      doTableUpdate = true;
+    });
+    td.appendChild(btn);
+
+    btn = document.createElement('button');
+    btn.innerHTML = '~&#402;';
+    btn.title = 'Taylor approximation';
+    btn.addEventListener('click', () => {
+      addLine({
+        type: '~',
+        id,
+        degree: 3,
+        C: 0,
+      });
+      update = true;
+      newCache = true;
       doTableUpdate = true;
     });
     td.appendChild(btn);

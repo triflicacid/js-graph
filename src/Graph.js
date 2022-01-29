@@ -1,4 +1,4 @@
-import { calcCoordsFromGradient, calcGradient, extractChangeOfSign, getAsymptotes, getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getIntercepts, lerpCoords, rotateCoords, roundMultiple, roundTowards0 } from "./utils.js";
+import { calcCoordsFromGradient, calcGradient, extractChangeOfSign, getAsymptotes, getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getIntercepts, lerpCoords, rotateCoords, roundMultiple, roundTowards0, taylorApprox } from "./utils.js";
 
 export class Graph {
   constructor(canvas, eventListenerEl) {
@@ -481,6 +481,32 @@ export class Graph {
             }
             break;
           }
+          case '~': {
+            if (this._lines.get(data.id) === undefined) {
+              data.emsg = 'Unknown line with ID ' + data.id;
+            } else {
+              try {
+                let approx;
+                try {
+                  approx = this.taylorApprox(data.id, data.degree, data.C ?? 0);
+                } catch (e) {
+                  console.warn(e);
+                  data.emsg = 'Unable to create Taylor approximation. Does this curve exist at <a=' + data.C + '>?';
+                  break;
+                }
+                data.fnRaw = approx.fnRaw;
+                data.fn = approx.fn;
+                const inc = xAxisSpan / ncoords;
+                for (var i = 0, x = opts.xstart; i < ncoords; ++i, x += inc) {
+                  let y = approx.fn(x);
+                  if (Graph.validCoordinates(x, y)) coords.push([x, y]);
+                }
+              } catch (e) {
+                data.emsg = e.message;
+              }
+            }
+            break;
+          }
           default:
             data.emsg = `Unknown plot type '${data.type}'`;
         }
@@ -647,6 +673,18 @@ export class Graph {
     } else {
       return undefined;
     }
+  }
+
+  /** Return taylor-approximation of curve with given id. Returns line object, but does not create it. */
+  taylorApprox(id, n, around = 0) {
+    const coords = this._lines.get(id).coords;
+    const coeffs = taylorApprox(coords, n, around);
+    const eq = coeffs.map((c, i) => c === 0 ? '' : c + (i === 0 ? '' : '*' + (around === 0 ? 'x' : `(x${around < 0 ? '' : '-'}${around})`) + '**' + i)).filter(x => x.length !== 0).join('+');
+    return {
+      type: 'x',
+      fnRaw: eq,
+      fn: Function('x', 'return ' + eq)
+    };
   }
 
   /** Populate this._events */

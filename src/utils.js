@@ -118,7 +118,6 @@ export function getCorrespondingCoordinate(coord, axis, coords, many = false, dp
           lerp(next[1], last[1], 0.5)
         ]);
       } else {
-        console.log("lerp", last, next)
         region = [
           lerp(next[0], last[0], 0.5),
           lerp(next[1], last[1], 0.5)
@@ -164,10 +163,13 @@ export function getCorrepondingCoordinateIndex(coord, axis, coords, many = false
       if (many) region.push(i);
       else { region = i; break; }
     } else if ((coord >= last[IDX] && coord <= next[IDX]) || (coord >= next[IDX] && coord <= last[IDX])) {
+      let dl = Math.abs(coord - last[IDX]); // Difference: value and last
+      let dn = Math.abs(coord - next[IDX]); // Difference: value and next
+      let j = dl < dn ? i - 1 : i; // Find smallest difference
       if (many) {
-        region.push(i);
+        region.push(j);
       } else {
-        region = i;
+        region = j;
         break;
       }
     }
@@ -306,4 +308,25 @@ export function downloadTextFile(text, fname) {
 export function factorial(n) {
   for (let k = n - 1; k > 1; k--) n *= k;
   return n;
+}
+
+/** Return coefficients of x^0, x^1, ..., x^n for Taylor approximation given coordinates */
+export function taylorApprox(coords, n, around = 0) {
+  let denom = 1; // Denominator of fractions
+  const i0 = getCorrepondingCoordinateIndex(around, 'x', coords, false);
+  const before = [], after = []; // Coordinates before/after (0,y) at i0
+  for (let a = 1; a <= n * 2; a++) {
+    before.unshift(coords[i0 - a]);
+    after.push(coords[i0 + a]);
+  }
+  let ncoords = [...before, coords[i0], ...after].filter(x => x);
+  const coeffs = [coords[i0][1]];
+  for (let a = 0; a < n; a++) {
+    denom *= a + 1;
+    ncoords = calcGradient(ncoords);
+    const coord = getCorrespondingCoordinate(around, 'x', ncoords, false);
+    const y = coord == undefined ? around : coord[1];
+    coeffs.push(1 / denom * y);
+  }
+  return coeffs;
 }
