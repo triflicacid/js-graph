@@ -1361,7 +1361,17 @@ function updateTable() {
     tr.insertAdjacentHTML('beforeend', `<td><abbr title='${LINE_DESCRIPTIONS[line.type]}'>${line.type}</abbr></td>`);
 
     // LINE COLOR
-    tr.insertAdjacentHTML('beforeend', `<td style='background-color:${line.color ?? 'black'}'></td>`);
+    let colortd = document.createElement('td');
+    tr.appendChild(colortd);
+    colortd.style.backgroundColor = line.color ?? 'black';
+    let inputColor = document.createElement("input");
+    inputColor.type = "color";
+    inputColor.value = line.color;
+    inputColor.addEventListener("change", () => {
+      line.color = inputColor.value;
+      colortd.style.backgroundColor = inputColor.value;
+    });
+    colortd.addEventListener("click", () => inputColor.click());
 
     // LINE CONFIG
     td = document.createElement('td');
