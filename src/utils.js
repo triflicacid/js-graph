@@ -16,6 +16,14 @@ export function extractCoords(event) {
   return coords;
 }
 
+export const getTextMetrics = (ctx, text) => {
+  const metrics = ctx.measureText(text);
+  return {
+    width: metrics.width,
+    height: metrics.fontBoundingBoxDescent + metrics.fontBoundingBoxAscent,
+  };
+};
+
 /** Are the coordinates over the element */
 export function isMouseOver(element, x, y) {
   let bb = element.getBoundingClientRect();
@@ -329,4 +337,38 @@ export function taylorApprox(coords, n, around = 0) {
     coeffs.push(1 / denom * y);
   }
   return coeffs;
+}
+
+const inRange = (value, target, offset) => target - offset <= value && value <= target + offset;
+
+export function getMaxPoints(coords) {
+  let maxY = -Infinity;
+  let points = [];
+  let D = 0.00001;
+  for (let coord of coords) {
+    if (coord[1] > maxY && !inRange(coord[1], maxY, D)) {
+      maxY = coord[1];
+      points.length = 0;
+      points.push(coord);
+    } else if (inRange(coord[1], maxY, D) && (points.length < 1 || !inRange(coord[0], points[points.length - 1][0], D))) {
+      points.push(coord);
+    }
+  }
+  return points;
+}
+
+export function getMinPoints(coords) {
+  let minY = Infinity;
+  let points = [];
+  let D = 0.00001;
+  for (let coord of coords) {
+    if (coord[1] < minY && !inRange(coord[1], minY, D)) {
+      minY = coord[1];
+      points.length = 0;
+      points.push(coord);
+    } else if (inRange(coord[1], minY, D) && (points.length < 1 || !inRange(coord[0], points[points.length - 1][0], D))) {
+      points.push(coord);
+    }
+  }
+  return points;
 }

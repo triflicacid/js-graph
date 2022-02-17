@@ -1,0 +1,4 @@
+- Sidebar containing line overview (id, type, color) as well as constants
+    - Function to create these widgets
+- Click on line will open "analyse" options at bottom of page (integrate, y-intercepts etc...)
+- Scaling options will be at top of page

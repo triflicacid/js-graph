@@ -1,4 +1,5 @@
-import { calcCoordsFromGradient, calcGradient, extractChangeOfSign, getAsymptotes, getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getIntercepts, lerpCoords, rotateCoords, roundMultiple, roundTowards0, taylorApprox } from "./utils.js";
+import { Point } from "./Point.js";
+import { calcCoordsFromGradient, calcGradient, extractChangeOfSign, getAsymptotes, getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getIntercepts, lerpCoords, roundMultiple, roundTowards0, taylorApprox, getMaxPoints, getMinPoints } from "./utils.js";
 
 export class Graph {
   constructor(canvas, eventListenerEl) {
@@ -10,6 +11,7 @@ export class Graph {
     this._lines = new Map();
     this.opts = {};
     this._events = []; // Array of [event-type, event-handler, bound-handler]
+    this._points = [];
   }
 
   get width() { return this._canvas.width; }
@@ -106,6 +108,30 @@ export class Graph {
     return (this.height / this.opts.ystepGap) * this.opts.ystep;
   }
 
+  /** Add points to line: ({ typeID, lineID, x, y } | Point)[] */
+  addPoints(data) {
+    for (let arg of data) {
+      if (arg instanceof Point) {
+        this._points.push(arg);
+      } else {
+        this._points.push(new Point(arg.lineID, arg.typeID, +arg.x, +arg.y));
+      }
+    }
+  }
+
+  /** Remove all points which meet ALL of the given criteria: { lineID, typeID } */
+  removePoints(obj) {
+    let c = 0;
+    for (let i = this._points.length - 1; i >= 0; i--) {
+      if ((obj.lineID === undefined || obj.lineID === this._points[i].lineID) && (obj.typeID === undefined || obj.typeID === this._points[i].typeID)) {
+        this._points.splice(i, 1);
+        c++;
+      }
+    }
+    return c;
+  }
+
+  /** Sketch graph layer */
   sketch() {
     this.fixOpts();
 
@@ -267,6 +293,12 @@ export class Graph {
         }
       }
     }
+  }
+
+  /** Sketch points */
+  sketchPoints() {
+    const translateCoords = (x, y) => this.getCoordinates(x, y);
+    this._points.forEach(p => p.display(this._ctx, translateCoords));
   }
 
   /** Populate data.coords for a line. Return false | array of coords. */
@@ -685,6 +717,16 @@ export class Graph {
       fnRaw: eq,
       fn: Function('x', 'return ' + eq)
     };
+  }
+
+  /** Get maximum points of a function */
+  getMaxPoints(id) {
+    return getMaxPoints(this._lines.get(id).coords);
+  }
+
+  /** Get minimum points of a function */
+  getMinPoints(id) {
+    return getMinPoints(this._lines.get(id).coords);
   }
 
   /** Populate this._events */

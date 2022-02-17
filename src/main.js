@@ -1,4 +1,5 @@
 import { Graph } from "./Graph.js";
+import { Point } from "./Point.js";
 import Popup from "./Popup.js";
 import { circle, extractCoords, getCorrespondingCoordinate, clamp, round, log, lerp, getCorrepondingCoordinateIndex, getAudioFromCoords, random, downloadTextFile, factorial } from "./utils.js";
 
@@ -135,7 +136,7 @@ function generateSavedCurvesPopup() {
       addLine(line);
       doTableUpdate = true;
       update = true;
-      newCache = true;
+      newLineCache = true;
     });
     el.appendChild(btn);
     popup.insertAdjacentElement("beforeend", el);
@@ -885,7 +886,7 @@ btnViewDefault.innerText = 'Default';
 btnViewDefault.addEventListener('click', () => {
   g.opts = {};
   g.fixOpts();
-  newCache = true;
+  newLineCache = true;
   update = true;
 });
 divOpts.appendChild(btnViewDefault);
@@ -896,7 +897,7 @@ btnViewTrig.title = 'Suitable scale for trigonometric functions';
 btnViewTrig.addEventListener('click', () => {
   g.opts = initTrig();
   g.fixOpts();
-  newCache = true;
+  newLineCache = true;
   update = true;
 });
 divOpts.appendChild(btnViewTrig);
@@ -914,7 +915,7 @@ btnViewSound.addEventListener('click', () => {
     xstepGap: 50,
   };
   g.fixOpts();
-  newCache = true;
+  newLineCache = true;
   update = true;
 });
 divOpts.appendChild(btnViewSound);
@@ -927,7 +928,7 @@ btnViewND.addEventListener('click', () => {
   try { K.μ } catch (e) { addConstant('μ', false, 'Mean Value', 0); }
   g.opts = initBellCurve();
   g.fixOpts();
-  newCache = true;
+  newLineCache = true;
   update = true;
 });
 divOpts.appendChild(btnViewND);
@@ -938,7 +939,7 @@ btnConfig.innerText = 'Config';
 btnConfig.addEventListener('click', () => {
   const popup = generateConfigPopup();
   popup.setCloseCallback(() => {
-    newCache = true;
+    newLineCache = true;
     update = true;
   });
   popup.show();
@@ -949,7 +950,7 @@ let btnForceUpdate = document.createElement('button');
 btnForceUpdate.innerText = 'Update';
 btnForceUpdate.title = 'Force sketch update';
 btnForceUpdate.addEventListener('click', () => {
-  newCache = true;
+  newLineCache = true;
   update = true;
 });
 divOpts.appendChild(btnForceUpdate);
@@ -993,11 +994,18 @@ const tbody = table.createTBody();
 //#endregion
 
 //#region UPDATE LOOP
-let update = false, newCache = true, doCache = true, cache, doTableUpdate = false, coords, graphCoords; // Update the canvas?
-let updateOnMouseMove = true;
+let update = false, // Update the canvas?
+  newLineCache = true, // Generate new cache with just graph line functions sketched?
+  newPointCache = true, // Generate new cache with points skecthed?
+  doCache = true, // Are we using cache optimisation?
+  lineCache, // Cache data for graph line functions
+  pointCache, // Cache data for all points on graph (with lineCache)
+  doTableUpdate = false, // Update table?
+  coords, // Actual mouse coordinates
+  graphCoords, // Coordinates on canvas, translated to graph
+  updateOnMouseMove = true; // Show mouse coordinates?
 let fps = 0, lastCallTime = performance.now();
-const fnDrawData = new Map(); // Map line IDs to the corresponding sketch info
-window.fnDrawData = fnDrawData;
+const lineMap = new Map(); // Map line IDs to the corresponding sketch info
 (function loop() {
   let now = performance.now();
   fps = 1000 / (now - lastCallTime);
@@ -1006,8 +1014,8 @@ window.fnDrawData = fnDrawData;
   if (update) {
     if (doTableUpdate) { updateTable(); doTableUpdate = false; }
     g.clear();
-    // Load cache
-    if (!doCache || newCache) {
+    // ! GENERATE LINE CACHE
+    if (!doCache || newLineCache) {
       g.sketch(); // Sketch lines
       g.getLines().forEach(id => { // Error messages?
         const line = g.getLine(id), el = lineErrorEls.get(id);
@@ -1019,58 +1027,22 @@ window.fnDrawData = fnDrawData;
           el.removeAttribute('title');
         }
       });
-      // Sketch things in fnDrawData
-      fnDrawData.forEach((data, id) => {
-        const line = g.getLine(id);
-        if (line.draw) {
-          const R = 4;
-          if (data.yInt) {
-            data.yInt_cache.forEach(([x, y]) => circle(g.ctx, ...g.getCoordinates(x, y), R, line.color));
-          }
-          if (data.roots) {
-            data.roots_cache.forEach(([x, y]) => circle(g.ctx, ...g.getCoordinates(x, y), R, line.color));
-          }
-          if (data.turning) {
-            data.turning_cache.forEach(([x, y]) => circle(g.ctx, ...g.getCoordinates(x, y), R, line.color));
-          }
-          if (data.int !== undefined) {
-            data.int_cache.forEach(([x, y]) => circle(g.ctx, ...g.getCoordinates(x, y), R, line.color));
-          }
-          if (data.xCoords !== undefined) {
-            data.xCoords_cache.forEach(([x, y]) => circle(g.ctx, ...g.getCoordinates(x, y), R, line.color));
-          }
-          if (data.yCoords !== undefined) {
-            data.yCoords_cache.forEach(([x, y]) => circle(g.ctx, ...g.getCoordinates(x, y), R, line.color));
-          }
-          if (data.asys !== undefined) {
-            g.ctx.setLineDash([5, 3]);
-            g.ctx.lineWidth = 1;
-            data.asys_cache.x.forEach(x => {
-              const coords = g.getCoordinates(x, 0);
-              g.ctx.beginPath();
-              g.ctx.moveTo(coords[0], 0);
-              g.ctx.lineTo(coords[0], g.canvas.height);
-              g.ctx.stroke();
-              g.ctx.fillText(g.opts.xstepLabel ? g.opts.xstepLabel(x) : x.toPrecision(g.opts.labelPrecision), coords[0] + 5, coords[1] - 5);
-            });
-            data.asys_cache.y.forEach(y => {
-              const coords = g.getCoordinates(0, y);
-              g.ctx.beginPath();
-              g.ctx.moveTo(0, coords[1]);
-              g.ctx.lineTo(g.canvas.width, coords[1]);
-              g.ctx.stroke();
-              g.ctx.fillText(g.opts.xstepLabel ? g.opts.xstepLabel(y) : y.toPrecision(g.opts.labelPrecision), coords[0] + 5, coords[1] - 5);
-            });
-            g.ctx.setLineDash([]);
-          }
-        }
-      });
 
-      cache = g.ctx.getImageData(0, 0, g.width, g.height); // Save canvas
-      newCache = false;
+      lineCache = g.ctx.getImageData(0, 0, g.width, g.height); // Save canvas
     } else {
-      g.ctx.putImageData(cache, 0, 0);
+      g.ctx.putImageData(lineCache, 0, 0);
     }
+
+    if (!doCache || newPointCache || newLineCache) {
+      g.sketchPoints();
+      pointCache = g.ctx.getImageData(0, 0, g.width, g.height); // Save canvas
+    } else {
+      g.ctx.putImageData(pointCache, 0, 0);
+    }
+
+    newLineCache = false;
+    newPointCache = false;
+
     // Show current coordinates and trace
     if (coords && graphCoords) {
       if (SHOW_COORDS) {
@@ -1080,7 +1052,7 @@ window.fnDrawData = fnDrawData;
       }
       const originCoords = g.getCoordinates(0, 0);
 
-      fnDrawData.forEach((data, id) => {
+      lineMap.forEach((data, id) => {
         if (data.traceX || data.traceY) {
           const line = g.getLine(id);
           const TEXT_OFF = 5;
@@ -1241,14 +1213,14 @@ function updateKList() {
       input.step = obj.step;
       input.addEventListener('input', () => {
         obj.value = +input.value;
-        newCache = true;
+        newLineCache = true;
         update = true;
       });
     } else {
       input.type = 'number';
       input.addEventListener('change', () => {
         obj.value = +input.value;
-        newCache = true;
+        newLineCache = true;
         update = true;
       });
     }
@@ -1266,7 +1238,7 @@ function updateKList() {
     del.addEventListener('click', () => {
       constants.delete(constant);
       updateKList();
-      newCache = true;
+      newLineCache = true;
       update = true;
     });
     li.appendChild(del);
@@ -1307,7 +1279,24 @@ g.addEvents({
     if (dragging) {
       g.opts.xstart -= graphCoords[0] - dragData.apos[0];
       g.opts.ystart -= graphCoords[1] - dragData.apos[1];
-      newCache = true;
+      newLineCache = true;
+      onupdate();
+    }
+
+    let change = false;
+    const pr = g.fromCoordinates(Point.radius + 1, 0)[0] - g.fromCoordinates(0, 0)[0];
+    g._points.forEach(p => {
+      if (p.flag) {
+        p.flag = false;
+        change = true;
+      }
+      if (graphCoords[0] > p.x - pr && graphCoords[0] <= p.x + pr && graphCoords[1] > p.y - pr && graphCoords[1] <= p.y + pr) {
+        p.flag = true;
+        change = true;
+      }
+    });
+    if (change) {
+      newLineCache = true;
       onupdate();
     }
   },
@@ -1319,7 +1308,7 @@ g.addEvents({
   mouseup(e, onupdate) {
     dragging = false;
     dragData = undefined;
-    newCache = true;
+    newLineCache = true;
     onupdate();
   },
   wheel(e, onupdate) {
@@ -1327,7 +1316,7 @@ g.addEvents({
     e.preventDefault();
     g.opts.ystepGap *= k;
     g.opts.xstepGap *= k;
-    newCache = true;
+    newLineCache = true;
     onupdate();
   }
 }, () => (update = true));
@@ -1343,7 +1332,7 @@ function updateTable() {
   tbody.innerHTML = '';
   lineErrorEls.clear();
   g.getLines().forEach(id => {
-    const line = g.getLine(id), sketchData = fnDrawData.get(id), tr = document.createElement('tr');
+    const line = g.getLine(id), mapData = lineMap.get(id), tr = document.createElement('tr');
     tbody.appendChild(tr);
 
     // LINE ID
@@ -1382,7 +1371,7 @@ function updateTable() {
       const popup = generateNewLinePopup(() => {
         popup.hide();
         update = true;
-        newCache = true;
+        newLineCache = true;
         doTableUpdate = true;
       }, line);
       popup.show();
@@ -1396,7 +1385,7 @@ function updateTable() {
       input.value = line.C;
       input.addEventListener('change', () => {
         line.C = +input.value;
-        newCache = true;
+        newLineCache = true;
         update = true;
       });
       td.appendChild(input);
@@ -1419,7 +1408,7 @@ function updateTable() {
         const theta = +e.target.value;
         displayRadians(theta);
         line.C[4] = theta;
-        newCache = true;
+        newLineCache = true;
         update = true;
       });
       td.appendChild(rotSlider);
@@ -1430,12 +1419,14 @@ function updateTable() {
     td = document.createElement('td');
     tr.appendChild(td);
 
-    let btn = document.createElement('button');
+    let input, btn;
+
+    btn = document.createElement('button');
     btn.innerText = 'd/dx';
     btn.title = 'Sketch gradient curve of this fuction';
     btn.addEventListener('click', () => {
       addLine({ type: 'd', id });
-      newCache = true;
+      newLineCache = true;
       update = true;
       doTableUpdate = true;
     });
@@ -1443,12 +1434,28 @@ function updateTable() {
 
     btn = document.createElement('button');
     btn.innerHTML = '&int;dx';
-    btn.title = 'Sketch integrand curve of this fuction (assumc C=0)';
+    btn.title = 'Sketch curve of anti-derivative of this fuction (assume C=0)';
     btn.addEventListener('click', () => {
       addLine({ type: 'i', id });
-      newCache = true;
+      newLineCache = true;
       update = true;
       doTableUpdate = true;
+    });
+    td.appendChild(btn);
+
+    btn = document.createElement('button');
+    btn.innerHTML = '&int;<span class="sub-sup"><sup>b</sup><sub>a</sub></span>&nbsp;&nbsp;&nbsp;dx';
+    btn.title = 'Integrate between limits (find area under curve)';
+    btn.addEventListener('click', () => {
+      let bounds = prompt(`Find area under curve between bounds\nFormat: <a>, <b>`, '0, 1');
+      if (bounds) {
+        let [a, b] = bounds.split(',').map(n => eval(n));
+        if (b < a) return alert(`Invalid bound relationship`);
+        let area = g.getArea(line.coords, a, b);
+        if (area === undefined) alert(`Area ${a}-${b} is undefined`);
+        if (isNaN(area)) alert(`Unable to calculate area ${a}-${b}`);
+        else alert(area);
+      }
     });
     td.appendChild(btn);
 
@@ -1463,170 +1470,42 @@ function updateTable() {
         C: 0,
       });
       update = true;
-      newCache = true;
+      newLineCache = true;
       doTableUpdate = true;
     });
     td.appendChild(btn);
 
-    btn = document.createElement('button');
-    btn.innerHTML = '&#8469;';
-    btn.title = 'View plotted points in a table';
-    btn.addEventListener('click', () => {
-      const win = window.open('about:blank');
-      win.document.title = `Coordinates for ${id}`;
-      win.document.body.insertAdjacentHTML('beforeend', `<h1>Table of Coordinates</h1>`);
-      win.document.body.insertAdjacentHTML('beforeend', `<p>Line <code>${id}</code></p>`);
-      const btnCSV = win.document.createElement('button');
-      btnCSV.innerText = 'As CSV';
-      btnCSV.addEventListener("click", () => {
-        let csv = line.coords.map(([x, y]) => x + ',' + y).join('\n');
-        downloadTextFile(csv, `fn-${line.type}-${id}.csv`);
-      });
-      win.document.body.appendChild(btnCSV);
-
-      const table = win.document.createElement('table');
-      table.insertAdjacentHTML("beforeend", "<thead><tr><th>&Xscr;</th><th>&Yscr;</th></tr></thead>");
-      const tbody = table.createTBody();
-      win.document.body.appendChild(table);
-      line.coords.forEach(([x, y]) => tbody.insertAdjacentHTML('beforeend', `<tr><td>${x}</td><td>${y}</td></tr>`));
-    });
+    ({ btn } = generateButtonCheckboxPoints(g, id, null, '&#8469;', 'View all points in a table', null, 'Table of Coordinates', () => g._lines.get(id).coords));
     td.appendChild(btn);
 
-    btn = document.createElement('button');
-    btn.innerHTML = '&Yscr;-Int';
-    btn.title = 'Calculate approx. Y-intercepts';
-    btn.addEventListener('click', () => {
-      const yIntercepts = g.getAxisIntercept(id, 'y');
-      const win = window.open('about:blank');
-      win.document.title = `Y-Intercepts for ${id}`;
-      win.document.body.insertAdjacentHTML('beforeend', `<h1>Approximate Y-Intercepts</h1>`);
-      win.document.body.insertAdjacentHTML('beforeend', `<p>Line <code>${id}</code></p>`);
-      const ul = win.document.createElement('ul');
-      win.document.body.appendChild(ul);
-      yIntercepts.forEach(([x, y]) => ul.insertAdjacentHTML('beforeend', `<li><kbd>(${x}, <b>${y}</b>)</kbd></li>`));
-    });
+    ({ btn, input } = generateButtonCheckboxPoints(g, id, 0, '&Yscr;-Int', 'calculate approx. y-intercepts', 'yInt', 'Approximate Y-Intercepts', () => g.getAxisIntercept(id, 'y')));
     td.appendChild(btn);
-    let input = document.createElement('input');
-    input.type = 'checkbox';
-    input.checked = sketchData.yInt;
-    input.title = 'Sketch Y-Intercepts';
-    input.addEventListener('change', e => {
-      const data = fnDrawData.get(id);
-      if (e.target.checked) {
-        data.yInt = true;
-        data.yInt_cache = g.getAxisIntercept(id, 'y');
-      } else {
-        delete data.yInt;
-        delete data.yInt_cache;
-      }
-      newCache = true;
-      update = true;
-    });
     td.appendChild(input);
 
-    btn = document.createElement('button');
-    btn.innerHTML = 'Int';
-    btn.title = 'Calculate approx. intercepts with another line';
-    btn.addEventListener('click', () => {
-      let oid = prompt(`ID of line to intercept with`);
+    ({ btn, input } = generateButtonCheckboxPoints(g, id, 5, 'Int', 'calculate approx. intercepts with another line', 'int', 'Approximate Intercepts', () => {
+      const oid = prompt(`ID of line to intercept with`);
       if (!oid) return;
-      let otherLine = g.getLine(+oid);
-      if (!otherLine) return alert(`Line ID ${oid} does not exist`);
-      const intercepts = g.getIntercepts(line.coords, otherLine.coords, 3);
-      const win = window.open('about:blank');
-      win.document.title = `Intercepts for ${id} and ${oid}`;
-      win.document.body.insertAdjacentHTML('beforeend', `<h1>Approximate Y-Intercepts</h1>`);
-      win.document.body.insertAdjacentHTML('beforeend', `<p>Line <code>${id}</code> and <code>${oid}</code></p>`);
-      const ul = win.document.createElement('ul');
-      win.document.body.appendChild(ul);
-      intercepts.forEach(([x, y]) => ul.insertAdjacentHTML('beforeend', `<li><kbd>(${x}, ${y})</kbd></li>`));
-    });
+      const oline = g.getLine(+oid);
+      if (!oline) return alert(`Line ID ${oid} does not exist`);
+      return g.getIntercepts(g.getLine(id).coords, oline.coords, 3);
+    }));
     td.appendChild(btn);
-    input = document.createElement('input');
-    input.type = 'checkbox';
-    input.checked = sketchData.int !== undefined;
-    input.title = 'Sketch intercepts with another line';
-    input.addEventListener('change', e => {
-      const data = fnDrawData.get(id);
-      if (e.target.checked) {
-        const oid = prompt(`ID of line to intercept with`);
-        if (!oid) return;
-        const oline = g.getLine(+oid);
-        if (!oline) return alert(`Line ID ${oid} does not exist`);
-
-        data.int = oid;
-        data.int_cache = g.getIntercepts(line.coords, oline.coords, 3);
-      } else {
-        delete data.int;
-        delete data.int_cache;
-      }
-      newCache = true;
-      update = true;
-    });
     td.appendChild(input);
 
-    btn = document.createElement('button');
-    btn.innerHTML = 'Roots';
-    btn.title = 'Calculate approx. roots';
-    btn.addEventListener('click', () => {
-      const roots = g.getAxisIntercept(id, 'x');
-      const win = window.open('about:blank');
-      win.document.title = `Roots for ${id}`;
-      win.document.body.insertAdjacentHTML('beforeend', `<h1>Approximate Roots</h1>`);
-      win.document.body.insertAdjacentHTML('beforeend', `<p>Line <code>${id}</code></p>`);
-      const ul = win.document.createElement('ul');
-      win.document.body.appendChild(ul);
-      roots.forEach(([x, y]) => ul.insertAdjacentHTML('beforeend', `<li><kbd>(<b>${x}</b>, ${y})</kbd></li>`));
-    });
+    ({ btn, input } = generateButtonCheckboxPoints(g, id, 1, 'Roots', 'calculate approx. roots', 'roots', 'Approximate Roots', () => g.getAxisIntercept(id, 'x')));
     td.appendChild(btn);
-    input = document.createElement('input');
-    input.type = 'checkbox';
-    input.checked = sketchData.roots;
-    input.title = 'Sketch roots';
-    input.addEventListener('change', e => {
-      const data = fnDrawData.get(id);
-      if (e.target.checked) {
-        data.roots = true;
-        data.roots_cache = g.getAxisIntercept(id, 'x');
-      } else {
-        delete data.roots;
-        delete data.roots_cache;
-      }
-      newCache = true;
-      update = true;
-    });
     td.appendChild(input);
 
-    btn = document.createElement('button');
-    btn.innerHTML = 'Turning';
-    btn.title = 'Calculate approx. turning points';
-    btn.addEventListener('click', () => {
-      const tpts = g.getTurningPoints(id);
-      const win = window.open('about:blank');
-      win.document.title = `Turning Points for ${id}`;
-      win.document.body.insertAdjacentHTML('beforeend', `<h1>Approximate Turning Points</h1>`);
-      win.document.body.insertAdjacentHTML('beforeend', `<p>Line <code>${id}</code></p>`);
-      const ul = win.document.createElement('ul');
-      win.document.body.appendChild(ul);
-      tpts.forEach(([x, y]) => ul.insertAdjacentHTML('beforeend', `<li><kbd>(${x}, ${y})</kbd></li>`));
-    });
+    ({ btn, input } = generateButtonCheckboxPoints(g, id, 3, 'Max', 'calculate approx. maximum points', 'max', 'Approximate Maximum Points', () => g.getMaxPoints(id)));
     td.appendChild(btn);
-    input = document.createElement('input');
-    input.type = 'checkbox';
-    input.checked = sketchData.turning;
-    input.title = 'Sketch turning points';
-    input.addEventListener('change', e => {
-      const data = fnDrawData.get(id);
-      if (e.target.checked) {
-        data.turning = true;
-        data.turning_cache = g.getTurningPoints(id);
-      } else {
-        delete data.turning;
-        delete data.turning_cache;
-      }
-      newCache = true;
-      update = true;
-    });
+    td.appendChild(input);
+
+    ({ btn, input } = generateButtonCheckboxPoints(g, id, 2, 'Min', 'calculate approx. minimum points', 'min', 'Approximate Minimum Points', () => g.getMinPoints(id)));
+    td.appendChild(btn);
+    td.appendChild(input);
+
+    ({ btn, input } = generateButtonCheckboxPoints(g, id, 4, 'Turning', 'calculate approx. turning points', 'turning', 'Approximate Turning Points', () => g.getTurningPoints(id)));
+    td.appendChild(btn);
     td.appendChild(input);
 
     btn = document.createElement('button');
@@ -1650,37 +1529,21 @@ function updateTable() {
     td.appendChild(btn);
     input = document.createElement('input');
     input.type = 'checkbox';
-    input.checked = sketchData.turning;
+    input.checked = mapData.turning;
     input.title = 'Display asymptotes';
     input.addEventListener('change', e => {
-      const data = fnDrawData.get(id);
+      const data = lineMap.get(id);
       if (e.target.checked) {
         data.asys = true;
-        data.asys_cache = g.getAsymptotes(id);
+        data.asysPoints = g.getAsymptotes(id);
       } else {
         delete data.asys;
-        delete data.asys_cache;
+        delete data.asysPoints;
       }
-      newCache = true;
+      newLineCache = true;
       update = true;
     });
     td.appendChild(input);
-
-    btn = document.createElement('button');
-    btn.innerHTML = '&int;<span class="sub-sup"><sup>b</sup><sub>a</sub></span>&nbsp;&nbsp;&nbsp;dx';
-    btn.title = 'Integrate between limits (find area under curve)';
-    btn.addEventListener('click', () => {
-      let bounds = prompt(`Find area under curve between bounds\nFormat: <a>, <b>`, '0, 1');
-      if (bounds) {
-        let [a, b] = bounds.split(',').map(n => eval(n));
-        if (b < a) return alert(`Invalid bound relationship`);
-        let area = g.getArea(line.coords, a, b);
-        if (area === undefined) alert(`Area ${a}-${b} is undefined`);
-        if (isNaN(area)) alert(`Unable to calculate area ${a}-${b}`);
-        else alert(area);
-      }
-    });
-    td.appendChild(btn);
 
     // btn = document.createElement('button');
     // btn.innerHTML = `&mu;`;
@@ -1722,19 +1585,20 @@ function updateTable() {
     input = document.createElement('input');
     input.type = 'checkbox';
     input.addEventListener('change', e => {
-      const data = fnDrawData.get(id);
+      const data = lineMap.get(id);
       if (e.target.checked) {
         let x = prompt(`X-Coordinate`);
         if (!x) return;
         x = eval(x);
 
         data.xCoords = true;
-        data.xCoords_cache = getCorrespondingCoordinate(x, 'x', line.coords, true);
+        const coords = getCorrespondingCoordinate(x, 'x', line.coords, true);
+        g.addPoints(coords.map(([x, y]) => ({ lineID: id, typeID: -1, x, y })));
       } else {
         delete data.xCoords;
-        delete data.xCoords_cache;
+        g.removePoints({ lineID: id, typeID: -1 });
       }
-      newCache = true;
+      newLineCache = true;
       update = true;
     });
     td.appendChild(input);
@@ -1759,19 +1623,20 @@ function updateTable() {
     input = document.createElement('input');
     input.type = 'checkbox';
     input.addEventListener('change', e => {
-      const data = fnDrawData.get(id);
+      const data = lineMap.get(id);
       if (e.target.checked) {
         let y = prompt(`Y-Coordinate`);
         if (!y) return;
         y = eval(y);
 
         data.yCoords = true;
-        data.yCoords_cache = getCorrespondingCoordinate(y, 'y', line.coords, true, DP_ACCURACY);
+        const coords = getCorrespondingCoordinate(y, 'y', line.coords, true, DP_ACCURACY);
+        g.addPoints(coords.map(([x, y]) => ({ lineID: id, typeID: -1, x, y })));
       } else {
         delete data.yCoords;
-        delete data.yCoords_cache;
+        g.removePoints({ lineID: id, typeID: -1 });
       }
-      newCache = true;
+      newLineCache = true;
       update = true;
     });
     td.appendChild(input);
@@ -1779,32 +1644,32 @@ function updateTable() {
     td.insertAdjacentHTML('beforeend', 'TrX ');
     let inputTrX = document.createElement('input');
     inputTrX.type = 'checkbox';
-    inputTrX.checked = sketchData.traceX;
+    inputTrX.checked = mapData.traceX;
     inputTrX.title = 'Show current x-coordinate intercept with function';
     inputTrX.addEventListener('change', e => {
-      const data = fnDrawData.get(id);
+      const data = lineMap.get(id);
       if (e.target.checked) {
         data.traceX = true;
       } else {
         delete data.traceX;
       }
-      newCache = true;
+      newLineCache = true;
       update = true;
     });
     td.appendChild(inputTrX);
     td.insertAdjacentHTML('beforeend', 'TrY ');
     let inputTrY = document.createElement('input');
     inputTrY.type = 'checkbox';
-    inputTrY.checked = sketchData.traceY;
+    inputTrY.checked = mapData.traceY;
     inputTrY.title = 'Show current y-coordinate intercept with function';
     inputTrY.addEventListener('change', e => {
-      const data = fnDrawData.get(id);
+      const data = lineMap.get(id);
       if (e.target.checked) {
         data.traceY = true;
       } else {
         delete data.traceY;
       }
-      newCache = true;
+      newLineCache = true;
       update = true;
     });
     td.appendChild(inputTrY);
@@ -1812,16 +1677,16 @@ function updateTable() {
     td.insertAdjacentHTML('beforeend', 'Tgt ');
     let inputTangent = document.createElement('input');
     inputTangent.type = 'checkbox';
-    inputTangent.checked = sketchData.tangent;
+    inputTangent.checked = mapData.tangent;
     inputTangent.title = 'Draw tangent to curve at current x';
     inputTangent.addEventListener('change', e => {
-      const data = fnDrawData.get(id);
+      const data = lineMap.get(id);
       if (e.target.checked) {
         data.tangent = true;
       } else {
         delete data.tangent;
       }
-      newCache = true;
+      newLineCache = true;
       update = true;
     });
     td.appendChild(inputTangent);
@@ -1832,8 +1697,10 @@ function updateTable() {
     let audioContext, source;
     soundInputs.push(input);
     input.addEventListener('change', e => {
+      const data = lineMap.get(id);
       if (e.target.checked) {
         const o = getAudioFromCoords(line.coords, soundDurMult, soundMultiplier);
+        data.audio = o;
         audioContext = o.audioContext;
         source = o.source;
         source.loop = soundLoop;
@@ -1846,6 +1713,7 @@ function updateTable() {
       } else {
         // source.loop = false;
         source.stop();
+        delete data.audio;
       }
     });
     td.appendChild(input);
@@ -1855,7 +1723,7 @@ function updateTable() {
     btn.addEventListener('click', () => {
       addLine({ ...line });
       update = true;
-      newCache = true;
+      newLineCache = true;
       doTableUpdate = true;
     });
     td.appendChild(btn);
@@ -1865,7 +1733,7 @@ function updateTable() {
     btn.addEventListener('click', () => {
       removeLine(id);
       update = true;
-      newCache = true;
+      newLineCache = true;
       doTableUpdate = true;
     });
     td.appendChild(btn);
@@ -1877,7 +1745,7 @@ function updateTable() {
     input.checked = line.draw === undefined || line.draw;
     input.addEventListener('change', e => {
       line.draw = e.target.checked;
-      newCache = true;
+      newLineCache = true;
       update = true;
     });
     td.appendChild(input);
@@ -1894,7 +1762,7 @@ function updateTable() {
     const popup = generateNewLinePopup(data => {
       popup.hide();
       addLine(data);
-      newCache = true;
+      newLineCache = true;
       update = true;
       doTableUpdate = true;
     });
@@ -1903,6 +1771,52 @@ function updateTable() {
   td.appendChild(btn);
 }
 //#endregion
+
+/** Generate Button and Input to plot points for a given line */
+function generateButtonCheckboxPoints(g, lineID, typeID, btnText, btnTitle, lineMapProp, pageTitle, getCoordsFn) {
+      let btn = document.createElement('button');
+      btn.innerHTML = btnText;
+      btn.title = btnTitle;
+      btn.addEventListener('click', () => {
+        const coords = getCoordsFn();
+        const win = window.open('about:blank');
+        win.document.title = `Coords: ${btnText} for ${id}`;
+        win.document.body.insertAdjacentHTML('beforeend', `<h1>${pageTitle}</h1>`);
+        win.document.body.insertAdjacentHTML('beforeend', `<p>Line <code>${id}</code></p>`);
+        const btnCSV = win.document.createElement('button');
+        btnCSV.innerText = 'As CSV';
+        btnCSV.addEventListener("click", () => {
+          let csv = coords.map(([x, y]) => x + ',' + y).join('\n');
+          downloadTextFile(csv, `coords-${lineID}.csv`);
+        });
+        win.document.body.appendChild(btnCSV);
+        const ul = win.document.createElement('ul');
+        win.document.body.appendChild(ul);
+        coords.forEach(([x, y]) => ul.insertAdjacentHTML('beforeend', `<li><kbd>(${x}, ${y})</kbd></li>`));
+      });
+
+      let input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !!lineMap.get(lineID)[lineMapProp];
+      input.title = `Sketch ${btnTitle}`;
+      input.addEventListener('change', e => {
+        const data = lineMap.get(lineID);
+        if (e.target.checked) {
+          data[lineMapProp] = true;
+          const coords = getCoordsFn();
+          if (!coords) return;
+          g.addPoints(coords.map(([x, y]) => ({ lineID, typeID, x, y })));
+        } else {
+          delete data[lineMapProp];
+          g.removePoints({ lineID, typeID });
+        }
+        newLineCache = true;
+        newPointCache = true;
+        update = true;
+      });
+
+      return { btn, input };
+    }
 
 //#region FUNCTIONS
 // Create line object
@@ -1983,14 +1897,19 @@ function createLine(type = undefined, value = undefined, arg = undefined, proper
 // Add line object to graph
 function addLine(data) {
   const id = g.addLine(data);
-  fnDrawData.set(id, {});
+  lineMap.set(id, {});
   return id;
 }
 
 // Remove line object from graph
 function removeLine(id) {
   let ok = g.removeLine(id);
-  if (ok) fnDrawData.delete(id);
+  if (ok) {
+    const data = lineMap.get(id);
+    if (data.audio) data.audio.source.stop();
+    g.removePoints({ lineID: id });
+    lineMap.delete(id);
+  }
   return ok;
 }
 
@@ -2063,9 +1982,11 @@ addFunc('ndist', ['x', 'μ=0', 'σ=1'], '(1/(σ * sqrt(2 * pi))) * e ** (-0.5 * 
 //#endregion
 
 //#region USER CODE
+// g._points.push(new Point(-1, -1, 2, 2));
+addLine(createLine('x', 'sin(x)'));
 soundDurMult = 10;
 g.opts.ncoords = 10_000;
 update = true;
-newCache = true;
+newLineCache = true;
 doTableUpdate = true;
 //#endregion
