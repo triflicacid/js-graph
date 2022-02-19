@@ -1,5 +1,5 @@
 import { Point } from "./Point.js";
-import { calcCoordsFromGradient, calcGradient, extractChangeOfSign, getAsymptotes, getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getIntercepts, lerpCoords, roundMultiple, roundTowards0, taylorApprox, getMaxPoints, getMinPoints } from "./utils.js";
+import { calcCoordsFromGradient, calcGradient, extractChangeOfSign, getAsymptotes, getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getIntercepts, lerpCoords, roundMultiple, roundTowards0, taylorApprox, getMaxPoints, getMinPoints, roundTowardsInf } from "./utils.js";
 
 export class Graph {
   constructor(canvas, eventListenerEl) {
@@ -193,17 +193,19 @@ export class Graph {
           this._ctx.moveTo(x, 0);
           this._ctx.lineTo(x, this.height);
           this._ctx.stroke();
+        }
+      }
 
-          if (this.opts.subGridDivs > 0) {
-            for (let ii = 0, xx = x; ii < this.opts.subGridDivs; ++ii, xx += subGridInc) {
-              this._ctx.beginPath();
-              this._ctx.strokeStyle = 'black';
-              this._ctx.lineWidth = this.opts.gridThickness / 2;
-              this._ctx.moveTo(xx, 0);
-              this._ctx.lineTo(xx, this.height);
-              this._ctx.stroke();
-            }
-          }
+      if (this.opts.grid && this.opts.subGridDivs > 0) {
+        const subGridInc = this.opts.xstepGap / this.opts.subGridDivs;
+        let x = this.getCoordinates(roundMultiple(this.fromCoordinates(0, 0)[0], this.opts.xstep / this.opts.subGridDivs, roundTowardsInf), 0)[0];
+        for (let i = 0; x <= this.width; i++, x += subGridInc) {
+          this._ctx.beginPath();
+          this._ctx.strokeStyle = 'black';
+          this._ctx.lineWidth = this.opts.gridThickness / 2;
+          this._ctx.moveTo(x, 0);
+          this._ctx.lineTo(x, this.height);
+          this._ctx.stroke();
         }
       }
     }
@@ -239,7 +241,7 @@ export class Graph {
       this._ctx.fillStyle = 'black';
       this._ctx.textBaseline = 'middle';
 
-      const lll = 5, subGridInc = this.opts.ystepGap / this.opts.subGridDivs;
+      const lll = 5;
       for (let i = 0, n = roundMultiple(this.opts.ystart, this.opts.ystep, roundTowards0), y = this.getCoordinates(0, n)[1]; y < this.height; i++, n -= this.opts.ystep, y += this.opts.ystepGap) {
         if (n !== 0 && this.opts.markYAxis) {
           const label = this.opts.ystepLabel ? this.opts.ystepLabel(n) : n.toPrecision(this.opts.labelPrecision);
@@ -255,7 +257,6 @@ export class Graph {
             this._ctx.fillText(label, x, y);
           }
         }
-
         if (this.opts.grid) {
           this._ctx.beginPath();
           this._ctx.strokeStyle = 'black';
@@ -263,17 +264,19 @@ export class Graph {
           this._ctx.moveTo(0, y);
           this._ctx.lineTo(this.width, y);
           this._ctx.stroke();
+        }
+      }
 
-          if (this.opts.subGridDivs > 0) {
-            for (let ii = 0, yy = y; ii < this.opts.subGridDivs; ++ii, yy += subGridInc) {
-              this._ctx.beginPath();
-              this._ctx.strokeStyle = 'black';
-              this._ctx.lineWidth = this.opts.gridThickness / 2;
-              this._ctx.moveTo(0, yy);
-              this._ctx.lineTo(this.width, yy);
-              this._ctx.stroke();
-            }
-          }
+      if (this.opts.grid && this.opts.subGridDivs > 0) {
+        const subGridInc = this.opts.ystepGap / this.opts.subGridDivs;
+        let y = this.getCoordinates(0, roundMultiple(this.fromCoordinates(0, 0)[1], this.opts.ystep / this.opts.subGridDivs, roundTowardsInf))[1];
+        for (let i = 0; y <= this.height; i++, y += subGridInc) {
+          this._ctx.beginPath();
+          this._ctx.strokeStyle = 'black';
+          this._ctx.lineWidth = this.opts.gridThickness / 2;
+          this._ctx.moveTo(0, y);
+          this._ctx.lineTo(this.width, y);
+          this._ctx.stroke();
         }
       }
     }

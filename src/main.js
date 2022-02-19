@@ -185,6 +185,7 @@ function main() {
     let id = addLine(createLine("x", "x**3 - a*x", undefined, { color: "#FF00F9" }), graphData);
     populateLineAnalysisDiv(analysisOptionsDiv, graphData, id, itemListContainer);
     setConstant(graphData, 'a', 2.5);
+    window.graph = graphData.graph;
     // =================
 
     populateItemList(itemListContainer, graphData, analysisOptionsDiv);
@@ -270,6 +271,7 @@ function setupGraph(parent) {
                 if (!renderParams.caching || data.update || doneUpdate) { // Update cache
                     data.create(); // Create new cache
                     doneUpdate = true;
+                    data.update = false;
                 } else {
                     ctx.putImageData(data.data, 0, 0); // Render image cache to canvas
                 }

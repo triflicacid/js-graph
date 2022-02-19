@@ -2,6 +2,7 @@
 export const roundMultiple = (n, m, roundFn = Math.round) => roundFn(n / m) * m;
 
 export const roundTowards0 = n => n < 0 ? Math.ceil(n) : Math.floor(n);
+export const roundTowardsInf = n => n < 0 ? Math.floor(n) : Math.ceil(n);
 
 /** Round number to <DP>=0 decimal places */
 export const round = (n, dp = 0) => {
