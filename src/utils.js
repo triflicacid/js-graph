@@ -54,6 +54,16 @@ export function clamp(n, min = -Infinity, max = Infinity) {
   return n;
 }
 
+/** Hide element */
+export function hideEl(el) {
+  el.setAttribute("hidden", "hidden");
+}
+
+/** Show element */
+export function showEl(el) {
+  el.removeAttribute("hidden");
+}
+
 /** Calculate coordinates of change of gradient (differentiation) */
 export function calcGradient(coords) {
   let pts = [];
@@ -192,6 +202,15 @@ export function circle(ctx, x, y, r, fillStyle = undefined) {
   if (fillStyle) ctx.fillStyle = fillStyle;
   ctx.arc(x, y, r, 0, 2 * Math.PI);
   ctx.fill();
+}
+
+/** Create an HTML button */
+export function createButton(innerHTML, title=undefined, onClick=undefined) {
+  const btn = document.createElement('button');
+  btn.innerHTML = innerHTML;
+  if (title) btn.title = title;
+  if (onClick) btn.addEventListener("click", onClick);
+  return btn;
 }
 
 /** Lerp array of coordinates IN PLACE (mutates input array) */

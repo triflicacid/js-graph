@@ -604,7 +604,7 @@ export class Graph {
         } else if (Math.abs(y - coords[i + 1][1]) >= asyh) {
           this._ctx.stroke();
           inPath = false;
-        } else if (Math.abs(coords[i + 1][0] - x) > g.opts.xstep) {
+        } else if (Math.abs(coords[i + 1][0] - x) > this.opts.xstep) {
           this._ctx.stroke();
           inPath = false;
         }
