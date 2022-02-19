@@ -182,9 +182,8 @@ function main() {
     setFunction(graphData, 'ndist', ['x', 'μ=0', 'σ=1'], '(1/(σ * sqrt(2 * pi))) * e ** (-0.5 * ((x - μ) / σ) ** 2)', true);
 
     // === USER CODE ===
-    let id = addLine(createLine("x", "x**3 - a*x", undefined, { color: "#FF00F9" }), graphData);
+    let id = addLine(createLine("x", "x**3 - 3*x", undefined, { color: "#FF00F9" }), graphData);
     populateLineAnalysisDiv(analysisOptionsDiv, graphData, id, itemListContainer);
-    setConstant(graphData, 'a', 2.5);
     window.graph = graphData.graph;
     // =================
 
@@ -1763,11 +1762,11 @@ function populateLineAnalysisDiv(parent, graphData, lineID, itemListContainer) {
   divCoords.appendChild(btn);
   divCoords.appendChild(input);
   // Maximum points
-  ({ btn, input } = generateButtonCheckboxPoints(graphData, lineID, 3, 'Max', 'calculate approx. maximum points', 'max', 'Approximate Maximum Points', () => graphData.graph.getMaxPoints(lineID)));
+  ({ btn, input } = generateButtonCheckboxPoints(graphData, lineID, 3, 'Max', 'calculate approx. local maximum points', 'max', 'Approximate Maximum Points', () => graphData.graph.getMaxPoints(lineID)));
   divCoords.appendChild(btn);
   divCoords.appendChild(input);
   // Minimum points
-  ({ btn, input } = generateButtonCheckboxPoints(graphData, lineID, 2, 'Min', 'calculate approx. minimum points', 'min', 'Approximate Minimum Points', () => graphData.graph.getMinPoints(lineID)));
+  ({ btn, input } = generateButtonCheckboxPoints(graphData, lineID, 2, 'Min', 'calculate approx. local minimum points', 'min', 'Approximate Minimum Points', () => graphData.graph.getMinPoints(lineID)));
   divCoords.appendChild(btn);
   divCoords.appendChild(input);
   // Turning points

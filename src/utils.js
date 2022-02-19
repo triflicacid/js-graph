@@ -361,17 +361,20 @@ export function taylorApprox(coords, n, around = 0) {
 
 const inRange = (value, target, offset) => target - offset <= value && value <= target + offset;
 
+/** Check for change in gradient around point coords[i]. Return UNDEFINED or BOOLEAN */
+const checkForInflection = (coords, i) => coords[i - 1] === undefined || coords[i + 1] === undefined ? undefined : Math.sign(coords[i][1] - coords[i - 1][1]) === Math.sign(coords[i][1] - coords[i + 1][1]);
+
 export function getMaxPoints(coords) {
   let maxY = -Infinity;
   let points = [];
   let D = 0.00001;
-  for (let coord of coords) {
-    if (coord[1] > maxY && !inRange(coord[1], maxY, D)) {
-      maxY = coord[1];
+  for (let i = 0; i < coords.length; i++) {
+    if (coords[i][1] > maxY && !inRange(coords[i][1], maxY, D) && checkForInflection(coords, i)) {
+      maxY = coords[i][1];
       points.length = 0;
-      points.push(coord);
-    } else if (inRange(coord[1], maxY, D) && (points.length < 1 || !inRange(coord[0], points[points.length - 1][0], D))) {
-      points.push(coord);
+      points.push(coords[i]);
+    } else if (inRange(coords[i][1], maxY, D) && checkForInflection(coords, i) && (points.length < 1 || !inRange(coords[i][0], points[points.length - 1][0], D))) {
+      points.push(coords[i]);
     }
   }
   return points;
@@ -381,13 +384,13 @@ export function getMinPoints(coords) {
   let minY = Infinity;
   let points = [];
   let D = 0.00001;
-  for (let coord of coords) {
-    if (coord[1] < minY && !inRange(coord[1], minY, D)) {
-      minY = coord[1];
+  for (let i = 0; i < coords.length; ++i) {
+    if (coords[i][1] < minY && !inRange(coords[i][1], minY, D) && checkForInflection(coords, i)) {
+      minY = coords[i][1];
       points.length = 0;
-      points.push(coord);
-    } else if (inRange(coord[1], minY, D) && (points.length < 1 || !inRange(coord[0], points[points.length - 1][0], D))) {
-      points.push(coord);
+      points.push(coords[i]);
+    } else if (inRange(coords[i][1], minY, D) && checkForInflection(coords, i) && (points.length < 1 || !inRange(coords[i][0], points[points.length - 1][0], D))) {
+      points.push(coords[i]);
     }
   }
   return points;

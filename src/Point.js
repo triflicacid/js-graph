@@ -11,11 +11,12 @@ export class Point {
     }
 
     typeString() {
-        return Point.types[this.typeID] || "Point";
+        return Point.types[this.typeID] || "";
     }
 
     toString() {
-        return `${this.typeString()}: (${this.x}, ${this.y})`;
+        const t = Point.types[this.typeID];
+        return (t ? `${t}: ` : '') + `(${this.x}, ${this.y})`;
     }
 
     display(ctx, transformCoords) {

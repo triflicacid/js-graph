@@ -1,5 +1,4 @@
 - Assymptotes
 - Organise settings - scaling, grid, smoothness, sound
 - Add Normal Distribution view
-- Min/Max - also find local min/max using sign changes
 - Simpson's integration between limits
