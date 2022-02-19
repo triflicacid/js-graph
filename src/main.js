@@ -210,6 +210,7 @@ function setupGraph(parent) {
         soundMultipler: 1, // What to multiple sound by
         dpAccuracy: 5, // How many decimal points should measurements etc... adhere to?
         showCoords: true, // Show mouse coordinates next to cursor?
+        displayDp: 2, // How may DP should coordinates be round to when displayed?
     };
     returnObj.settings = settings;
 
@@ -254,6 +255,7 @@ function setupGraph(parent) {
         data: undefined,
         update: true,
         create() {
+            Point.roundDp = settings.displayDp;
             graph.sketchPoints(); // Sketch all points
             this.data = graph.ctx.getImageData(0, 0, graph.width, graph.height); // Cache data
         },
@@ -277,13 +279,13 @@ function setupGraph(parent) {
             }
 
             // Render coordinates near mouse
-            if (renderParams.showCoords) {
+            if (settings.showCoords) {
                 ctx.beginPath();
                 ctx.fillStyle = "black";
                 ctx.arc(...renderParams.coords, 2, 0, 2*Math.PI);
                 ctx.fill();
                 ctx.font = '11px Arial';
-                ctx.fillText(`(${round(renderParams.graphCoords[0], 2)}, ${round(renderParams.graphCoords[1], 2)})`, coords[0] + 5, coords[1] - 5);
+                ctx.fillText(`(${round(renderParams.graphCoords[0], settings.displayDp)}, ${round(renderParams.graphCoords[1], settings.displayDp)})`, renderParams.coords[0] + 5, renderParams.coords[1] - 5);
             }
 
             // Render traces if necessary
@@ -943,60 +945,87 @@ function generateConfigPopup(graph, settings, onChange) {
 
   const pcTable = document.createElement("table");
   popup.insertAdjacentElement("beforeend", pcTable);
-  const pcTbody = pcTable.createTBody();
-  [
-    { field: 'Start X', title: 'Left-most X value', type: 'number', get: () => graph.opts.xstart, set: v => graph.opts.xstart = +v },
-    { field: 'X Step', title: 'Width of gap between x-axis markers', type: 'number', get: () => graph.opts.xstep, set: v => graph.opts.xstep = +v },
-    { field: 'X Step Gap', title: 'Gap (in pixels) between each x-axis marker', type: 'number', get: () => graph.opts.xstepGap, set: v => graph.opts.xstepGap = +v },
-    { field: 'Mark X', title: 'Mark x-axis', type: 'boolean', get: () => graph.opts.markXAxis, set: v => graph.opts.markXAxis = v },
+  const pcThead = pcTable.createTHead(), pcTbody = pcTable.createTBody();
+  const pcTheadRow = document.createElement("tr");
+  pcThead.appendChild(pcTheadRow);
+  const cols = [];
+  const optsArray = [
+    { field: 'Start X', col: 1, title: 'Left-most X value', type: 'number', get: () => graph.opts.xstart, set: v => graph.opts.xstart = +v },
+    { field: 'X Step', col: 1, title: 'Width of gap between x-axis markers', type: 'number', get: () => graph.opts.xstep, set: v => graph.opts.xstep = +v },
+    { field: 'X Step Gap', col: 1, title: 'Gap (in pixels) between each x-axis marker', type: 'number', get: () => graph.opts.xstepGap, set: v => graph.opts.xstepGap = +v },
+    { field: 'Mark X', col: 1, title: 'Mark x-axis', type: 'boolean', get: () => graph.opts.markXAxis, set: v => graph.opts.markXAxis = v },
 
-    { field: 'Start Y', title: 'Top-most Y value', type: 'number', get: () => graph.opts.ystart, set: v => graph.opts.ystart = +v },
-    { field: 'Y Step', title: 'Height of gap between y-axis markers', type: 'number', get: () => graph.opts.ystep, set: v => graph.opts.ystep = +v },
-    { field: 'Y Step Gap', title: 'Gap (in pixels) between each y-axis marker', type: 'number', get: () => graph.opts.ystepGap, set: v => graph.opts.ystepGap = +v },
-    { field: 'Mark Y', title: 'Mark y-axis', type: 'boolean', get: () => graph.opts.markYAxis, set: v => graph.opts.markYAxis = v },
+    { field: 'Start Y', col: 1, title: 'Top-most Y value', type: 'number', get: () => graph.opts.ystart, set: v => graph.opts.ystart = +v },
+    { field: 'Y Step', col: 1, title: 'Height of gap between y-axis markers', type: 'number', get: () => graph.opts.ystep, set: v => graph.opts.ystep = +v },
+    { field: 'Y Step Gap', col: 1, title: 'Gap (in pixels) between each y-axis marker', type: 'number', get: () => graph.opts.ystepGap, set: v => graph.opts.ystepGap = +v },
+    { field: 'Mark Y', col: 1, title: 'Mark y-axis', type: 'boolean', get: () => graph.opts.markYAxis, set: v => graph.opts.markYAxis = v },
 
-    { field: '&Nscr;-Coords', title: 'Number of coordinat points to plot for each line function (directly impacts performance)', type: 'number', get: () => graph.opts.ncoords, set: v => graph.opts.ncoords = +v },
-    { field: 'Approx. Acc.', title: 'Accuracy (decimal places) of approximations i.e. finding roots', type: 'number', get: () => settings.dpAccuracy, set: v => settings.dpAccuracy = v },
-    { field: 'Line Width', title: 'Line width of each line function', type: 'number', min: 0, get: () => graph.opts.lineWidth, set: v => graph.opts.lineWidth = +v },
-    { field: 'Axis Thickness', title: 'Line thickness of the y/x-axis', type: 'number', get: () => graph.opts.axisThickness, set: v => graph.opts.axisThickness = v },
-    { field: 'Grid', title: 'Show grid', type: 'boolean', get: () => graph.opts.grid, set: v => graph.opts.grid = v },
-    { field: 'Grid Thickness', title: 'Line thickness of the grid', type: 'number', get: () => graph.opts.gridThickness, set: v => graph.opts.gridThickness = v },
-    { field: 'Sub-Grid Divs', title: 'Divisions inside each x/y-axis step', type: 'number', get: () => graph.opts.subGridDivs, set: v => graph.opts.subGridDivs = v },
-    { field: 'Show Coords', title: 'Show approx. coordinates next to cursor', type: 'boolean', get: () => settings.showCoords, set: v => settings.showCoords = v },
+    { field: 'Axis Thickness', col: 2, title: 'Line thickness of the y/x-axis', type: 'number', get: () => graph.opts.axisThickness, set: v => graph.opts.axisThickness = v },
+    { field: 'Grid', col: 2, title: 'Show grid', type: 'boolean', get: () => graph.opts.grid, set: v => graph.opts.grid = v },
+    { field: 'Grid Thickness', col: 2, title: 'Line thickness of the grid', type: 'number', get: () => graph.opts.gridThickness, set: v => graph.opts.gridThickness = v },
+    { field: 'Sub-Grid Divs', col: 2, title: 'Divisions inside each x/y-axis step', type: 'number', get: () => graph.opts.subGridDivs, set: v => graph.opts.subGridDivs = v },
+    { field: 'Line Width', col: 2, title: 'Line width of each line function', type: 'number', min: 0, get: () => graph.opts.lineWidth, set: v => graph.opts.lineWidth = +v },
+    { field: 'Show Coords', col: 2, title: 'Show approx. coordinates next to cursor', type: 'boolean', get: () => settings.showCoords, set: v => settings.showCoords = v },
+    
+    { field: '&Nscr;-Coords', col: 3, title: 'Number of coordinat points to plot for each line function (directly impacts performance)', type: 'number', get: () => graph.opts.ncoords, set: v => graph.opts.ncoords = +v },
+    { field: 'Approx. Acc.', col: 3, title: 'Accuracy (decimal places) of approximations i.e. finding roots', type: 'number', get: () => settings.dpAccuracy, set: v => settings.dpAccuracy = v },
+    { field: 'Display Acc.', col: 3, title: 'Accuracy (decimal places) to round coordinates to when displayed', type: 'number', get: () => settings.displayDp, set: v => settings.displayDp = v },
 
-    { field: 'Sound Loop', title: 'Loop sound audio', type: 'boolean', get: () => settings.soundLoop, set: v => settings.soundLoop = v },
-    { field: 'Sound K', title: 'Multiply sound data by this constant', type: 'number', get: () => settings.soundMultiplier, set: v => settings.soundMultiplier = v },
-    { field: 'Sound Dur. K', title: 'Multiply sound duration by this constant', type: 'number', get: () => settings.soundDurMult, set: v => settings.soundDurMult = v },
-
-  ].forEach(opts => {
-    const tr = document.createElement("tr");
-    pcTbody.appendChild(tr);
-    tr.insertAdjacentHTML("beforeend", `<th><abbr title='${opts.title}'>${opts.field}</abbr></th>`);
-    let td = document.createElement('td');
-    tr.appendChild(td);
-    const input = document.createElement('input');
-    if (opts.type === 'number') {
-      input.type = 'number';
-      if (opts.min !== undefined) input.min = opts.min;
-      if (opts.max !== undefined) input.max = opts.max;
-      input.addEventListener('change', () => {
-        opts.set(clamp(+input.value, opts.min, opts.max));
-      });
-    } else if (opts.type === 'boolean') {
-      input.type = 'checkbox';
-      input.checked = opts.get();
-      input.addEventListener('change', () => {
-        opts.set(input.checked);
-      });
-    } else {
-      input.type = 'text';
-      input.addEventListener('change', () => {
-        opts.set(input.value);
-      });
-    }
-    input.value = opts.get();
-    td.appendChild(input);
+    { field: 'Loop', col: 4, title: 'Loop sound audio', type: 'boolean', get: () => settings.soundLoop, set: v => settings.soundLoop = v },
+    { field: 'Mult', col: 4, title: 'Multiply sound data by this constant', type: 'number', get: () => settings.soundMultiplier, set: v => settings.soundMultiplier = v },
+    { field: 'Dur. Mult', col: 4, title: 'Multiply sound duration by this constant', type: 'number', get: () => settings.soundDurMult, set: v => settings.soundDurMult = v },
+  ];
+  const colHeaders = ["X/Y", "Display", "Accuracy", "Sound"];
+  optsArray.forEach(opts => {
+    if (!cols[opts.col - 1]) cols[opts.col - 1] = [];
+    cols[opts.col - 1].push(opts);
   });
+  let rowEls = [], maxCol = -1;
+  cols.forEach(col => {
+    if (col.length > maxCol) maxCol = col.length;
+    while (rowEls.length < col.length) {
+      const row = document.createElement('tr');
+      rowEls.push(row);
+      pcTbody.appendChild(row);
+    }
+  });
+
+  for (let c = 0; c < cols.length; c++) {
+    pcTheadRow.insertAdjacentHTML("beforeend", `<th colspan="2">${colHeaders[c]}</th>`);
+    let r;
+    for (r = 0; r < cols[c].length; r++) {
+      const tr = rowEls[r], opts = cols[c][r];
+      tr.insertAdjacentHTML("beforeend", `<th><abbr title='${opts.title}'>${opts.field}</abbr></th>`);
+      let td = document.createElement('td');
+      tr.appendChild(td);
+      const input = document.createElement('input');
+      if (opts.type === 'number') {
+        input.type = 'number';
+        if (opts.min !== undefined) input.min = opts.min;
+        if (opts.max !== undefined) input.max = opts.max;
+        input.addEventListener('change', () => {
+          opts.set(clamp(+input.value, opts.min, opts.max));
+        });
+      } else if (opts.type === 'boolean') {
+        input.type = 'checkbox';
+        input.checked = opts.get();
+        input.addEventListener('change', () => {
+          opts.set(input.checked);
+        });
+      } else {
+        input.type = 'text';
+        input.addEventListener('change', () => {
+          opts.set(input.value);
+        });
+      }
+      input.value = opts.get();
+      td.appendChild(input);
+    }
+    while (r < maxCol) {
+      rowEls[r].insertAdjacentHTML("beforeend", "<td class='no-border' colspan='2' />");
+      r++;
+    }
+  };
   return popup;
 }
 

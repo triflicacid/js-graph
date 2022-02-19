@@ -1,4 +1,4 @@
-import { getTextMetrics } from "./utils.js";
+import { getTextMetrics, round } from "./utils.js";
 
 export class Point {
     constructor(lineID, typeID, x, y) {
@@ -16,7 +16,7 @@ export class Point {
 
     toString() {
         const t = Point.types[this.typeID];
-        return (t ? `${t}: ` : '') + `(${this.x}, ${this.y})`;
+        return (t ? `${t}: ` : '') + (isNaN(Point.roundDp) ? `(${this.x}, ${this.y})` : `(${round(this.x, Point.roundDp)}, ${round(this.y, Point.roundDp)})`);
     }
 
     display(ctx, transformCoords) {
@@ -53,3 +53,4 @@ Point.types = {
     5: 'Intercept',
 };
 Point.radius = 3;
+Point.roundDp = 2;

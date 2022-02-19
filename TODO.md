@@ -1,4 +1,3 @@
 - Assymptotes
-- Organise settings - scaling, grid, smoothness, sound
 - Add Normal Distribution view
 - Simpson's integration between limits
