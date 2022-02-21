@@ -1,7 +1,7 @@
 import { Graph } from "./Graph.js";
 import { Point } from "./Point.js";
 import Popup from "./Popup.js";
-import { extractCoords, round, clamp, hideEl, showEl, createButton, getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getAudioFromCoords, log, random, factorial } from "./utils.js";
+import { HEX_ALPHA, extractCoords, round, clamp, createButton, getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getAudioFromCoords, log, random, factorial } from "./utils.js";
 
 const LINE_TYPES = {
   'a': 'addition',
@@ -35,6 +35,20 @@ const LINE_DESCRIPTIONS = {
 };
 const PARAMETRIC_VARIABLE = 'p';
 const CONSTANT_SYM_REGEX = /^[a-z][a-z0-9_]*$/gmi;
+const SHADE_ENUM = {
+  "": "=",
+  "lt": "<",
+  "le": "≤",
+  "gt": ">",
+  "ge": "≥",
+};
+const SHADE_DESC = {
+  "": "Equal To",
+  "lt": "Less Than",
+  "le": "Less Than or Equal To",
+  "gt": "Greater Than",
+  "ge": "Greater Than or Equal To"
+};
 
 /** Program entry point */
 function main() {
@@ -53,7 +67,9 @@ function main() {
     const btnOpenConfigPopup = document.createElement("button");
     btnOpenConfigPopup.innerText = "Settings";
     btnOpenConfigPopup.addEventListener("click", () => {
-        const popup = generateConfigPopup(graphData.graph, graphData.settings, () => {
+        const popup = generateConfigPopup(graphData, () => {
+          populateItemList(itemListContainer, graphData, analysisOptionsDiv);
+        }, () => {
           graphData.renderParams.caches.line.update = true;
           graphData.renderParams.update = true;
         });
@@ -147,6 +163,7 @@ function main() {
     const graphData = setupGraph(canvasContainer);
     graphData.addEvents();
     graphData.render();
+    window.graphData = graphData;
 
     // Common functions
     setRawFunction(graphData, 'pow', Math.pow);
@@ -182,9 +199,9 @@ function main() {
     setFunction(graphData, 'ndist', ['x', 'μ=0', 'σ=1'], '(1/(σ * sqrt(2 * pi))) * e ** (-0.5 * ((x - μ) / σ) ** 2)', true);
 
     // === USER CODE ===
-    let id = addLine(createLine("x", "x**3 - 3*x", undefined, { color: "#FF00F9" }), graphData);
+    // let id = addLine(createLine("x", "x**3 - 3*x", undefined, { color: "#FF00F9" }), graphData);
+    let id = addLine(createLine("x", "x**2", undefined, { color: "#AA00AA", shade: "gt" }), graphData);
     populateLineAnalysisDiv(analysisOptionsDiv, graphData, id, itemListContainer);
-    window.graph = graphData.graph;
     // =================
 
     populateItemList(itemListContainer, graphData, analysisOptionsDiv);
@@ -439,7 +456,7 @@ function setupGraph(parent) {
     returnObj.constants = constants;
     // Common constants
     globalThis.pi = Math.PI;
-    globalThis.e = Math.e;
+    globalThis.e = Math.E;
 
     // Function map
     const funcs = new Map(); // funcname: string => { fn: Function, args: string[], source: string, visible: boolean }
@@ -553,7 +570,7 @@ function removeLine(lineID, graphData) {
 /** Create/set a constant */
 function setConstant(graphData, name, value) {
   if (graphData.constants.has(name)) {
-    graphData.constants.set(name).value = value;
+    graphData.constants.get(name).value = value;
   } else {
     graphData.constants.set(name, { value });
   }
@@ -710,7 +727,7 @@ function generateLineCard(lineID, graphData, analysisOptionsDiv, itemListContain
 
   // Set background color of card
   function setBackground() {
-    card.style.backgroundColor = lineData.draw === false ? '' : 'rgba(' + (lineData.color || '#000000').substr(1).match(/..?/g).map(hex => parseInt(hex, 16)).join(",") + ',0.5)';
+    card.style.backgroundColor = lineData.draw === false ? '' : (lineData.color || '#000000') + HEX_ALPHA;
   }
   setBackground();
 
@@ -911,7 +928,7 @@ function generateLineCardOverview(lineID, lineData, graphData, onChange) {
 }
 
 /** Generate global configutation popup */
-function generateConfigPopup(graph, settings, onChange) {
+function generateConfigPopup(graphData, onUpdateItemList, onChange) {
   const popup = new Popup('Configuration');
   popup.setCloseCallback(() => onChange());
   const zoomDiv = document.createElement("div");
@@ -921,8 +938,8 @@ function generateConfigPopup(graph, settings, onChange) {
   const btnZoomDefault = document.createElement('button');
   btnZoomDefault.innerText = 'Default';
   btnZoomDefault.addEventListener('click', () => {
-    graph.opts = {};
-    graph.fixOpts();
+    graphData.graph.opts = {};
+    graphData.graph.fixOpts();
     onChange();
     popup.hide();
   });
@@ -931,7 +948,7 @@ function generateConfigPopup(graph, settings, onChange) {
   const btnZoomTrig = document.createElement('button');
   btnZoomTrig.innerText = 'Trig';
   btnZoomTrig.addEventListener('click', () => {
-    graph.opts = {
+    graphData.graph.opts = {
       ystart: 2,
       ystep: 0.5,
       xstart: -2 * Math.PI - 0.5,
@@ -942,6 +959,42 @@ function generateConfigPopup(graph, settings, onChange) {
     popup.hide();
   });
   zoomDiv.appendChild(btnZoomTrig);
+  // Zoom: normal distribution
+  const btnZoomND = document.createElement('button');
+  btnZoomND.innerText = 'ND';
+  btnZoomND.title = "Normal Distribution";
+  btnZoomND.addEventListener('click', () => {
+    let addedVar = false;
+    if (!graphData.constants.has('s')) {
+      setConstant(graphData, 's', 1);
+      addedVar = true;
+    }
+    if (!graphData.constants.has('m')) {
+      setConstant(graphData, 'm', 0);
+      addedVar = true;
+    }
+    if (addedVar) onUpdateItemList();
+    const mean = graphData.constants.get("m").value;
+    const stddev = graphData.constants.get("s").value;
+    graphData.graph.opts = {
+      xstart: mean - 4.5 * stddev,
+      xstep: stddev,
+      xstepLabel: n => {
+        let v = round((n - mean) / stddev, 1);
+        let sgn = Math.sign(v) === -1 ? '-' : '+';
+        if (v === 0) return mean === 0 ? '0' : 'μ';
+        v = Math.abs(v);
+        v = (sgn === '+' && mean === 0 ? '' : sgn) + (v === 1 ? '' : v);
+        return (mean === 0 ? '' : 'μ') + v + 'σ';
+      },
+      ystart: 1.1,
+      ystep: 0.2,
+      subGridDivs: 5,
+    };
+    onChange();
+    popup.hide();
+  });
+  zoomDiv.appendChild(btnZoomND);
 
   const pcTable = document.createElement("table");
   popup.insertAdjacentElement("beforeend", pcTable);
@@ -950,30 +1003,30 @@ function generateConfigPopup(graph, settings, onChange) {
   pcThead.appendChild(pcTheadRow);
   const cols = [];
   const optsArray = [
-    { field: 'Start X', col: 1, title: 'Left-most X value', type: 'number', get: () => graph.opts.xstart, set: v => graph.opts.xstart = +v },
-    { field: 'X Step', col: 1, title: 'Width of gap between x-axis markers', type: 'number', get: () => graph.opts.xstep, set: v => graph.opts.xstep = +v },
-    { field: 'X Step Gap', col: 1, title: 'Gap (in pixels) between each x-axis marker', type: 'number', get: () => graph.opts.xstepGap, set: v => graph.opts.xstepGap = +v },
-    { field: 'Mark X', col: 1, title: 'Mark x-axis', type: 'boolean', get: () => graph.opts.markXAxis, set: v => graph.opts.markXAxis = v },
+    { field: 'Start X', col: 1, title: 'Left-most X value', type: 'number', get: () => graphData.graph.opts.xstart, set: v => graphData.graph.opts.xstart = +v },
+    { field: 'X Step', col: 1, title: 'Width of gap between x-axis markers', type: 'number', get: () => graphData.graph.opts.xstep, set: v => graphData.graph.opts.xstep = +v },
+    { field: 'X Step Gap', col: 1, title: 'Gap (in pixels) between each x-axis marker', type: 'number', get: () => graphData.graph.opts.xstepGap, set: v => graphData.graph.opts.xstepGap = +v },
+    { field: 'Mark X', col: 1, title: 'Mark x-axis', type: 'boolean', get: () => graphData.graph.opts.markXAxis, set: v => graphData.graph.opts.markXAxis = v },
 
-    { field: 'Start Y', col: 1, title: 'Top-most Y value', type: 'number', get: () => graph.opts.ystart, set: v => graph.opts.ystart = +v },
-    { field: 'Y Step', col: 1, title: 'Height of gap between y-axis markers', type: 'number', get: () => graph.opts.ystep, set: v => graph.opts.ystep = +v },
-    { field: 'Y Step Gap', col: 1, title: 'Gap (in pixels) between each y-axis marker', type: 'number', get: () => graph.opts.ystepGap, set: v => graph.opts.ystepGap = +v },
-    { field: 'Mark Y', col: 1, title: 'Mark y-axis', type: 'boolean', get: () => graph.opts.markYAxis, set: v => graph.opts.markYAxis = v },
+    { field: 'Start Y', col: 1, title: 'Top-most Y value', type: 'number', get: () => graphData.graph.opts.ystart, set: v => graphData.graph.opts.ystart = +v },
+    { field: 'Y Step', col: 1, title: 'Height of gap between y-axis markers', type: 'number', get: () => graphData.graph.opts.ystep, set: v => graphData.graph.opts.ystep = +v },
+    { field: 'Y Step Gap', col: 1, title: 'Gap (in pixels) between each y-axis marker', type: 'number', get: () => graphData.graph.opts.ystepGap, set: v => graphData.graph.opts.ystepGap = +v },
+    { field: 'Mark Y', col: 1, title: 'Mark y-axis', type: 'boolean', get: () => graphData.graph.opts.markYAxis, set: v => graphData.graph.opts.markYAxis = v },
 
-    { field: 'Axis Thickness', col: 2, title: 'Line thickness of the y/x-axis', type: 'number', get: () => graph.opts.axisThickness, set: v => graph.opts.axisThickness = v },
-    { field: 'Grid', col: 2, title: 'Show grid', type: 'boolean', get: () => graph.opts.grid, set: v => graph.opts.grid = v },
-    { field: 'Grid Thickness', col: 2, title: 'Line thickness of the grid', type: 'number', get: () => graph.opts.gridThickness, set: v => graph.opts.gridThickness = v },
-    { field: 'Sub-Grid Divs', col: 2, title: 'Divisions inside each x/y-axis step', type: 'number', get: () => graph.opts.subGridDivs, set: v => graph.opts.subGridDivs = v },
-    { field: 'Line Width', col: 2, title: 'Line width of each line function', type: 'number', min: 0, get: () => graph.opts.lineWidth, set: v => graph.opts.lineWidth = +v },
-    { field: 'Show Coords', col: 2, title: 'Show approx. coordinates next to cursor', type: 'boolean', get: () => settings.showCoords, set: v => settings.showCoords = v },
+    { field: 'Axis Thickness', col: 2, title: 'Line thickness of the y/x-axis', type: 'number', get: () => graphData.graph.opts.axisThickness, set: v => graphData.graph.opts.axisThickness = v },
+    { field: 'Grid', col: 2, title: 'Show grid', type: 'boolean', get: () => graphData.graph.opts.grid, set: v => graphData.graph.opts.grid = v },
+    { field: 'Grid Thickness', col: 2, title: 'Line thickness of the grid', type: 'number', get: () => graphData.graph.opts.gridThickness, set: v => graphData.graph.opts.gridThickness = v },
+    { field: 'Sub-Grid Divs', col: 2, title: 'Divisions inside each x/y-axis step', type: 'number', get: () => graphData.graph.opts.subGridDivs, set: v => graphData.graph.opts.subGridDivs = v },
+    { field: 'Line Width', col: 2, title: 'Line width of each line function', type: 'number', min: 0, get: () => graphData.graph.opts.lineWidth, set: v => graphData.graph.opts.lineWidth = +v },
+    { field: 'Show Coords', col: 2, title: 'Show approx. coordinates next to cursor', type: 'boolean', get: () => graphData.settings.showCoords, set: v => graphData.settings.showCoords = v },
     
-    { field: '&Nscr;-Coords', col: 3, title: 'Number of coordinat points to plot for each line function (directly impacts performance)', type: 'number', get: () => graph.opts.ncoords, set: v => graph.opts.ncoords = +v },
-    { field: 'Approx. Acc.', col: 3, title: 'Accuracy (decimal places) of approximations i.e. finding roots', type: 'number', get: () => settings.dpAccuracy, set: v => settings.dpAccuracy = v },
-    { field: 'Display Acc.', col: 3, title: 'Accuracy (decimal places) to round coordinates to when displayed', type: 'number', get: () => settings.displayDp, set: v => settings.displayDp = v },
+    { field: '&Nscr;-Coords', col: 3, title: 'Number of coordinat points to plot for each line function (directly impacts performance)', type: 'number', get: () => graphData.graph.opts.ncoords, set: v => graphData.graph.opts.ncoords = +v },
+    { field: 'Approx. Acc.', col: 3, title: 'Accuracy (decimal places) of approximations i.e. finding roots', type: 'number', get: () => graphData.settings.dpAccuracy, set: v => graphData.settings.dpAccuracy = v },
+    { field: 'Display Acc.', col: 3, title: 'Accuracy (decimal places) to round coordinates to when displayed', type: 'number', get: () => graphData.settings.displayDp, set: v => graphData.settings.displayDp = v },
 
-    { field: 'Loop', col: 4, title: 'Loop sound audio', type: 'boolean', get: () => settings.soundLoop, set: v => settings.soundLoop = v },
-    { field: 'Mult', col: 4, title: 'Multiply sound data by this constant', type: 'number', get: () => settings.soundMultiplier, set: v => settings.soundMultiplier = v },
-    { field: 'Dur. Mult', col: 4, title: 'Multiply sound duration by this constant', type: 'number', get: () => settings.soundDurMult, set: v => settings.soundDurMult = v },
+    { field: 'Loop', col: 4, title: 'Loop sound audio', type: 'boolean', get: () => graphData.settings.soundLoop, set: v => graphData.settings.soundLoop = v },
+    { field: 'Mult', col: 4, title: 'Multiply sound data by this constant', type: 'number', get: () => graphData.settings.soundMultiplier, set: v => graphData.settings.soundMultiplier = v },
+    { field: 'Dur. Mult', col: 4, title: 'Multiply sound duration by this constant', type: 'number', get: () => graphData.settings.soundDurMult, set: v => graphData.settings.soundDurMult = v },
   ];
   const colHeaders = ["X/Y", "Display", "Accuracy", "Sound"];
   optsArray.forEach(opts => {
@@ -1609,8 +1662,16 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
       return;
   }
 
-  div.insertAdjacentHTML("beforeend", "<br>");
   let el = document.createElement("span");
+  el.innerHTML = '<strong>Shade</strong>: ';
+  let selectShade = document.createElement("select");
+  for (let name in SHADE_ENUM) selectShade.insertAdjacentHTML("beforeend", `<option value="${name}" title="${SHADE_DESC[name]}"${lineData.shade === name ? " selected" : ""}>${SHADE_ENUM[name]}</option>`);
+  selectShade.addEventListener("change", () => lineData.shade = selectShade.value);
+  el.appendChild(selectShade);
+  div.appendChild(el);
+
+  div.insertAdjacentHTML("beforeend", "<br>");
+  el = document.createElement("span");
   el.innerHTML = '<strong>Line Width</strong>: ';
   let inputLineWidth = document.createElement("input");
   inputLineWidth.type = "number";

@@ -1,5 +1,5 @@
 import { Point } from "./Point.js";
-import { calcCoordsFromGradient, calcGradient, extractChangeOfSign, getAsymptotes, getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getIntercepts, lerpCoords, roundMultiple, roundTowards0, taylorApprox, getMaxPoints, getMinPoints, roundTowardsInf } from "./utils.js";
+import { HEX_ALPHA, calcCoordsFromGradient, calcGradient, extractChangeOfSign, getAsymptotes, getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getIntercepts, lerpCoords, roundMultiple, roundTowards0, taylorApprox, getMaxPoints, getMinPoints, roundTowardsInf } from "./utils.js";
 
 export class Graph {
   constructor(canvas, eventListenerEl) {
@@ -137,6 +137,7 @@ export class Graph {
 
     const yAxisSpan = this.getYAxisSpan();
     const xAxisSpan = this.getXAxisSpan();
+    const EPSILON = Number.EPSILON;
 
     // x-axis
     xAxis: {
@@ -171,7 +172,7 @@ export class Graph {
 
       const lll = 5, subGridInc = this.opts.xstepGap / this.opts.subGridDivs;
       for (let i = 0, n = roundMultiple(this.opts.xstart, this.opts.xstep, roundTowards0), x = this.getCoordinates(n, 0)[0]; x < this.width; i++, n += this.opts.xstep, x += this.opts.xstepGap) {
-        if (n !== 0 && this.opts.markXAxis) {
+        if (Math.abs(n) >= EPSILON && this.opts.markXAxis) {
           const label = this.opts.xstepLabel ? this.opts.xstepLabel(n) : n.toPrecision(this.opts.labelPrecision);
           if (line) {
             this._ctx.beginPath();
@@ -243,7 +244,7 @@ export class Graph {
 
       const lll = 5;
       for (let i = 0, n = roundMultiple(this.opts.ystart, this.opts.ystep, roundTowards0), y = this.getCoordinates(0, n)[1]; y < this.height; i++, n -= this.opts.ystep, y += this.opts.ystepGap) {
-        if (n !== 0 && this.opts.markYAxis) {
+        if (Math.abs(n) >= EPSILON && this.opts.markYAxis) {
           const label = this.opts.ystepLabel ? this.opts.ystepLabel(n) : n.toPrecision(this.opts.labelPrecision);
           if (line) {
             this._ctx.beginPath();
@@ -581,35 +582,57 @@ export class Graph {
     }
   }
 
+  /** Plot coordinate array according to line data */
   _plotPoints(coords, data) {
     this._ctx.save();
     this._ctx.lineWidth = data.lineWidth ?? this.opts.lineWidth;
     this._ctx.strokeStyle = data.color ?? 'black';
     data.color = this._ctx.strokeStyle;
+    data.shade ??= "";
     if (data.dash) this._ctx.setLineDash(data.dash);
 
     let off = 10, noff = -off, height = this.height + off, width = this.width + off, asyh = this.height / 1.5; // Check that coords are in screen bounds!
     if (data.join === undefined || data.join) {
       coords = coords.filter(([x, y]) => (x >= noff && x < width && y >= noff && y < height));
       let inPath = false;
+      let pathSectionStart; // Coordinates of path start
       for (let i = 0; i < coords.length; i++) {
         let [x, y] = coords[i];
         if (inPath) {
           this._ctx.lineTo(x, y);
         } else {
           this._ctx.beginPath();
+          if (data.shade[1] === "t") this._ctx.setLineDash([10, 4]); // Not equal to - dashed line
           this._ctx.moveTo(x, y);
+          pathSectionStart = coords[i];
           inPath = true;
         }
 
+        let stroke = false; // Close the path?
         if (coords[i + 1] === undefined) {
-          this._ctx.stroke();
+          stroke = true;
         } else if (Math.abs(y - coords[i + 1][1]) >= asyh) {
-          this._ctx.stroke();
+          stroke = true;
           inPath = false;
         } else if (Math.abs(coords[i + 1][0] - x) > this.opts.xstep) {
-          this._ctx.stroke();
+          stroke = true;
           inPath = false;
+        }
+        if (stroke) {
+          if (data.shade[0] === "g") { // Greater -> Above line
+            this._ctx.lineTo(x, -off);
+            this._ctx.lineTo(pathSectionStart[0], -off);
+            this._ctx.lineTo(...pathSectionStart);
+          } else if (data.shade[0] === "l") { // Less -> Below line
+            this._ctx.lineTo(x, this.height + off);
+            this._ctx.lineTo(pathSectionStart[0], this.height + off);
+            this._ctx.lineTo(...pathSectionStart);
+          }
+          this._ctx.stroke();
+          if (data.shade) {
+            this._ctx.fillStyle = (data.color || "#000000") + "35";
+            this._ctx.fill();
+          }
         }
       }
     } else {

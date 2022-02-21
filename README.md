@@ -79,7 +79,13 @@ Each line is an object which contains sketching and aesthetic data.
   - `x` : the x-axis boundaries are `min` and `max` respectively.
   - `y` : the y-axis boundaries are `min` and `max` respectively.
   - `a` : angle; span from `0` to `2pi`.
-- `type: 'x' | 'y' | 'p' | 'd' | 'i' | 'a' | 's' | 'm' | 't' | 'θ'` [*optional*] [`default='x'`] specifies the type of the line
+- `shade: string` [*optional*] [`default=""`] Shade area of curve. Ignored if `join=false`.
+  - ``   : default - just sketch the line
+  - `gt` : shade below the curve. Dashed line.
+  - `lt` : shade below the curve. Dashed line.
+  - `ge` : shade below the curve. Solid line.
+  - `le` : shade below the curve. Solid line.
+- `type: string` [*optional*] [`default='x'`] specifies the type of the line
   - `x` : the x-coordinates are passed into `data.fn` and the output is `y`. Coordinates: `[x, data.fn(x)]`.
   - `y` : the y-coordinates are passed into `data.fn` and the output is `x`. Coordinates: `[data.fn(y), y]`.
   - `p` : parametric. The paremeter `p` is controlled by `range` and outputs a 2-element array `[x, y]`. Coordinates: `data.fn(p)`.

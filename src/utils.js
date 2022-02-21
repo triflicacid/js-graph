@@ -1,3 +1,6 @@
+// ALPHA CHANNEL VALUE FOR DIMMED COLORS
+export const HEX_ALPHA = "80";
+
 /** Round N to the nearest multiple of M using the round function roundF (=Math.round) */
 export const roundMultiple = (n, m, roundFn = Math.round) => roundFn(n / m) * m;
 
