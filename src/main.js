@@ -53,459 +53,491 @@ const SHADE_DESC = {
 
 /** Program entry point */
 function main() {
-    const wrapper = document.createElement("div");
-    wrapper.classList.add("wrapper");
-    document.body.appendChild(wrapper);
+  const wrapper = document.createElement("div");
+  wrapper.classList.add("wrapper");
+  document.body.appendChild(wrapper);
 
-    const sidebarContainer = document.createElement("div");
-    sidebarContainer.classList.add("sidebar-container");
-    wrapper.appendChild(sidebarContainer);
+  const sidebarContainer = document.createElement("div");
+  sidebarContainer.classList.add("sidebar-container");
+  wrapper.appendChild(sidebarContainer);
 
-    const sidebarButtonContainer = document.createElement("div");
-    sidebarButtonContainer.classList.add("sidebar-button-container");
-    sidebarContainer.appendChild(sidebarButtonContainer);
+  const sidebarButtonContainer = document.createElement("div");
+  sidebarButtonContainer.classList.add("sidebar-button-container");
+  sidebarContainer.appendChild(sidebarButtonContainer);
 
-    const btnOpenConfigPopup = document.createElement("button");
-    btnOpenConfigPopup.innerText = "Settings";
-    btnOpenConfigPopup.addEventListener("click", () => {
-        const popup = generateConfigPopup(graphData, () => {
-          populateItemList(itemListContainer, graphData, analysisOptionsDiv);
-        }, () => {
-          graphData.renderParams.caches.line.update = true;
-          graphData.renderParams.update = true;
-        });
-        popup.show();
-    });
-    sidebarButtonContainer.appendChild(btnOpenConfigPopup);
-
-
-    const btnOpenFuncPopup = document.createElement("button");
-    btnOpenFuncPopup.innerText = "Functions";
-    btnOpenFuncPopup.addEventListener("click", () => {
-        const popup = generateFunctionPopup(graphData, () => {
-          graphData.renderParams.caches.line.update = true;
-          graphData.renderParams.update = true;
-        });
-        popup.show();
-    });
-    sidebarButtonContainer.appendChild(btnOpenFuncPopup);
-
-    const itemListContainer = document.createElement('div');
-    itemListContainer.classList.add("item-list-container");
-    sidebarContainer.appendChild(itemListContainer);
-
-    const btnAddNewLine = document.createElement('button');
-    btnAddNewLine.innerText = "+ Add Line";
-    btnAddNewLine.addEventListener('click', () => {
-      const popup = generateLinePopup(graphData.graph, lineData => {
-        popup.hide();
-        addLine(lineData, graphData); // Add line to graph
-        populateItemList(itemListContainer, graphData, analysisOptionsDiv);
-      });
-      popup.show();
-    });
-    sidebarContainer.appendChild(btnAddNewLine);
-
-    const btnAddNewConstant = document.createElement('button');
-    btnAddNewConstant.innerText = "+ Add Constant";
-    btnAddNewConstant.addEventListener('click', () => {
-      let sym = prompt(`Enter constant symbol`);
-      if (!sym) return;
-      if (!CONSTANT_SYM_REGEX.test(sym)) return alert(`Invalid symbol name - must match ${CONSTANT_SYM_REGEX}`);
-      if (graphData.constants.has(sym)) return alert(`Constant with symbol '${sym}' already exists`);
-      setConstant(graphData, sym, 1);
-      populateItemList(itemListContainer, graphData, analysisOptionsDiv); // Update item list
+  const btnOpenConfigPopup = document.createElement("button");
+  btnOpenConfigPopup.innerText = "Settings";
+  btnOpenConfigPopup.addEventListener("click", () => {
+    const popup = generateConfigPopup(graphData, () => {
+      populateItemList(itemListContainer, graphData, analysisOptionsDiv);
+    }, () => {
       graphData.renderParams.caches.line.update = true;
       graphData.renderParams.update = true;
     });
-    sidebarContainer.appendChild(btnAddNewConstant);
+    popup.show();
+  });
+  sidebarButtonContainer.appendChild(btnOpenConfigPopup);
 
-    const btnPlayAll = document.createElement('button');
-    let playingAll = false;
-    const updateBtnPlayAll = () => {
-      btnPlayAll.innerHTML = playingAll ? "&#x1F568;" : "&#x1F56A;";
-      btnPlayAll.title = playingAll ? 'Stop sound' : 'Play all curves';
-    };
+
+  const btnOpenFuncPopup = document.createElement("button");
+  btnOpenFuncPopup.innerText = "Functions";
+  btnOpenFuncPopup.addEventListener("click", () => {
+    const popup = generateFunctionPopup(graphData, () => {
+      graphData.renderParams.caches.line.update = true;
+      graphData.renderParams.update = true;
+    });
+    popup.show();
+  });
+  sidebarButtonContainer.appendChild(btnOpenFuncPopup);
+
+  const itemListContainer = document.createElement('div');
+  itemListContainer.classList.add("item-list-container");
+  sidebarContainer.appendChild(itemListContainer);
+
+  const btnAddNewLine = document.createElement('button');
+  btnAddNewLine.innerText = "+ Add Line";
+  btnAddNewLine.addEventListener('click', () => {
+    const popup = generateLinePopup(graphData.graph, lineData => {
+      popup.hide();
+      addLine(lineData, graphData); // Add line to graph
+      populateItemList(itemListContainer, graphData, analysisOptionsDiv);
+    });
+    popup.show();
+  });
+  sidebarContainer.appendChild(btnAddNewLine);
+
+  const btnAddNewConstant = document.createElement('button');
+  btnAddNewConstant.innerText = "+ Add Constant";
+  btnAddNewConstant.addEventListener('click', () => {
+    let sym = prompt(`Enter constant symbol`);
+    if (!sym) return;
+    if (!CONSTANT_SYM_REGEX.test(sym)) return alert(`Invalid symbol name - must match ${CONSTANT_SYM_REGEX}`);
+    if (graphData.constants.has(sym)) return alert(`Constant with symbol '${sym}' already exists`);
+    setConstant(graphData, sym, 1);
+    populateItemList(itemListContainer, graphData, analysisOptionsDiv); // Update item list
+    graphData.renderParams.caches.line.update = true;
+    graphData.renderParams.update = true;
+  });
+  sidebarContainer.appendChild(btnAddNewConstant);
+
+  const btnPlayAll = document.createElement('button');
+  let playingAll = false;
+  const updateBtnPlayAll = () => {
+    btnPlayAll.innerHTML = playingAll ? "&#x1F568;" : "&#x1F56A;";
+    btnPlayAll.title = playingAll ? 'Stop sound' : 'Play all curves';
+  };
+  updateBtnPlayAll();
+  btnPlayAll.addEventListener('click', async () => {
+    playingAll = !playingAll;
     updateBtnPlayAll();
-    btnPlayAll.addEventListener('click', async () => {
-      playingAll = !playingAll;
-      updateBtnPlayAll();
-      // Stop all audio sources
-      graphData.lines.forEach((obj, lineID) => {
-        if (obj.audio) {
-          obj.audio.source.stop();
-          delete obj.audio;
-        }
-      });
-      if (playingAll) { // Start playing sound of all sources
-        const promises = [];
-        graphData.graph.getLines().forEach((lineID) => {
-          if (graphData.graph.getLine(lineID).draw !== false) {
-            const promise = playAudioForLine(graphData, lineID);
-            promises.push(promise);
-          }
-        });
-        await Promise.all(promises);
-        playingAll = false;
-      updateBtnPlayAll();
+    // Stop all audio sources
+    graphData.lines.forEach((obj, lineID) => {
+      if (obj.audio) {
+        obj.audio.source.stop();
+        delete obj.audio;
       }
     });
-    sidebarContainer.appendChild(btnPlayAll);
+    if (playingAll) { // Start playing sound of all sources
+      const promises = [];
+      graphData.graph.getLines().forEach((lineID) => {
+        if (graphData.graph.getLine(lineID).draw !== false) {
+          const promise = playAudioForLine(graphData, lineID);
+          promises.push(promise);
+        }
+      });
+      await Promise.all(promises);
+      playingAll = false;
+      updateBtnPlayAll();
+    }
+  });
+  sidebarContainer.appendChild(btnPlayAll);
 
-    const canvasContainer = document.createElement("div");
-    canvasContainer.classList.add("canvas-container");
-    wrapper.appendChild(canvasContainer);
+  const canvasContainer = document.createElement("div");
+  canvasContainer.classList.add("canvas-container");
+  wrapper.appendChild(canvasContainer);
 
-    const analysisOptionsDiv = document.createElement("div");
-    analysisOptionsDiv.dataset.lineID = null;
-    analysisOptionsDiv.classList.add("analyse-line-container");
-    wrapper.appendChild(analysisOptionsDiv);
+  const analysisOptionsDiv = document.createElement("div");
+  analysisOptionsDiv.dataset.lineID = null;
+  analysisOptionsDiv.classList.add("analyse-line-container");
+  wrapper.appendChild(analysisOptionsDiv);
 
-    const graphData = setupGraph(canvasContainer);
-    graphData.addEvents();
-    graphData.render();
-    window.graphData = graphData;
+  const graphData = setupGraph(canvasContainer, itemListContainer, analysisOptionsDiv);
+  graphData.addEvents();
+  graphData.render();
+  window.graphData = graphData;
 
-    // Common functions
-    setRawFunction(graphData, 'pow', Math.pow);
-    setRawFunction(graphData, 'abs', Math.abs);
-    setRawFunction(graphData, 'round', round);
-    setRawFunction(graphData, 'floor', Math.floor);
-    setRawFunction(graphData, 'ceil', Math.ceil);
-    setRawFunction(graphData, 'sgn', Math.sign);
-    setRawFunction(graphData, 'sqrt', Math.sqrt);
-    setRawFunction(graphData, 'exp', Math.exp);
-    setRawFunction(graphData, 'sin', Math.sin);
-    setRawFunction(graphData, 'arcsin', Math.asin);
-    setRawFunction(graphData, 'sinh', Math.sinh);
-    setRawFunction(graphData, 'arcsinh', Math.asinh);
-    setRawFunction(graphData, 'csc', n => 1 / Math.sin(n));
-    setRawFunction(graphData, 'cos', Math.cos);
-    setRawFunction(graphData, 'arccos', Math.acos);
-    setRawFunction(graphData, 'cosh', Math.cosh);
-    setRawFunction(graphData, 'arccosh', Math.acosh);
-    setRawFunction(graphData, 'sec', n => 1 / Math.cos(n));
-    setRawFunction(graphData, 'tan', Math.tan);
-    setRawFunction(graphData, 'arctan', Math.atan);
-    setRawFunction(graphData, 'tanh', Math.tanh);
-    setRawFunction(graphData, 'arctanh', Math.atanh);
-    setRawFunction(graphData, 'cot', n => 1 / Math.tan(n));
-    setRawFunction(graphData, 'log', log);
-    setRawFunction(graphData, 'clamp', clamp);
-    setRawFunction(graphData, 'rand', random);
-    setRawFunction(graphData, 'factorial', factorial);
-    setFunction(graphData, 'frac', ['x'], 'x - floor(x)', true);
-    setFunction(graphData, 'sawtooth', ['x', 'T', 'A=1', 'P=0'], 'A * frac(x / T + P)', true);
-    setFunction(graphData, 'sinc', ['x'], 'x == 0 ? 1 : sin(pi*x)/(pi*x)', true);
-    setFunction(graphData, 'ndist', ['x', 'μ=0', 'σ=1'], '(1/(σ * sqrt(2 * pi))) * e ** (-0.5 * ((x - μ) / σ) ** 2)', true);
+  // Common functions
+  setRawFunction(graphData, 'pow', Math.pow);
+  setRawFunction(graphData, 'abs', Math.abs);
+  setRawFunction(graphData, 'round', round);
+  setRawFunction(graphData, 'floor', Math.floor);
+  setRawFunction(graphData, 'ceil', Math.ceil);
+  setRawFunction(graphData, 'sgn', Math.sign);
+  setRawFunction(graphData, 'sqrt', Math.sqrt);
+  setRawFunction(graphData, 'exp', Math.exp);
+  setRawFunction(graphData, 'sin', Math.sin);
+  setRawFunction(graphData, 'arcsin', Math.asin);
+  setRawFunction(graphData, 'sinh', Math.sinh);
+  setRawFunction(graphData, 'arcsinh', Math.asinh);
+  setRawFunction(graphData, 'csc', n => 1 / Math.sin(n));
+  setRawFunction(graphData, 'cos', Math.cos);
+  setRawFunction(graphData, 'arccos', Math.acos);
+  setRawFunction(graphData, 'cosh', Math.cosh);
+  setRawFunction(graphData, 'arccosh', Math.acosh);
+  setRawFunction(graphData, 'sec', n => 1 / Math.cos(n));
+  setRawFunction(graphData, 'tan', Math.tan);
+  setRawFunction(graphData, 'arctan', Math.atan);
+  setRawFunction(graphData, 'tanh', Math.tanh);
+  setRawFunction(graphData, 'arctanh', Math.atanh);
+  setRawFunction(graphData, 'cot', n => 1 / Math.tan(n));
+  setRawFunction(graphData, 'log', log);
+  setRawFunction(graphData, 'clamp', clamp);
+  setRawFunction(graphData, 'rand', random);
+  setRawFunction(graphData, 'factorial', factorial);
+  setFunction(graphData, 'frac', ['x'], 'x - floor(x)', true);
+  setFunction(graphData, 'sawtooth', ['x', 'T', 'A=1', 'P=0'], 'A * frac(x / T + P)', true);
+  setFunction(graphData, 'sinc', ['x'], 'x == 0 ? 1 : sin(pi*x)/(pi*x)', true);
+  setFunction(graphData, 'ndist', ['x', 'μ=0', 'σ=1'], '(1/(σ * sqrt(2 * pi))) * e ** (-0.5 * ((x - μ) / σ) ** 2)', true);
 
-    // === USER CODE ===
-    let id = addLine(createLine("x", "(x**3)*exp(-x)", undefined, { color: "#AA00AA" }), graphData);
-    populateLineAnalysisDiv(analysisOptionsDiv, graphData, id, itemListContainer);
-    // =================
+  // === USER CODE ===
+  // let id = addLine(createLine("x", "(x**3)*exp(-x)", undefined, { color: "#AA00AA" }), graphData);
+  let id = addLine(createLine("θ", "pi", undefined, { color: "#AA0055" }), graphData);
+  populateLineAnalysisDiv(analysisOptionsDiv, graphData, id, itemListContainer);
+  // =================
 
-    populateItemList(itemListContainer, graphData, analysisOptionsDiv);
+  populateItemList(itemListContainer, graphData, analysisOptionsDiv);
 }
 
 /** Sets up graph and attached it to a given parent element */
-function setupGraph(parent) {
-    const returnObj = { parent };
+function setupGraph(parent, itemListContainer, analysisOptionsDiv) {
+  const returnObj = { parent };
 
-    const canvas = document.createElement('canvas');
-    parent.appendChild(canvas);
-    canvas.width = parent.offsetWidth;
-    canvas.height = parent.offsetHeight;
-    returnObj.canvas = canvas;
+  const canvas = document.createElement('canvas');
+  parent.appendChild(canvas);
+  canvas.width = parent.offsetWidth;
+  canvas.height = parent.offsetHeight;
+  returnObj.canvas = canvas;
 
-    const graph = new Graph(canvas, canvas);
-    returnObj.graph = graph;
+  const graph = new Graph(canvas, canvas);
+  returnObj.graph = graph;
 
-    // Graph settings object
-    const settings = {
-        soundLoop: true, // Loop sound?
-        soundDurMult: 1, // Duration of each note
-        soundMultipler: 1, // What to multiple sound by
-        dpAccuracy: 5, // How many decimal points should measurements etc... adhere to?
-        showCoords: true, // Show mouse coordinates next to cursor?
-        displayDp: 2, // How may DP should coordinates be round to when displayed?
-        integrateLimitsN: 10000,
-    };
-    returnObj.settings = settings;
+  // Graph settings object
+  const settings = {
+    soundLoop: true, // Loop sound?
+    soundDurMult: 1, // Duration of each note
+    soundMultipler: 1, // What to multiple sound by
+    dpAccuracy: 5, // How many decimal points should measurements etc... adhere to?
+    showCoords: true, // Show mouse coordinates next to cursor?
+    displayDp: 2, // How may DP should coordinates be round to when displayed?
+    integrateLimitsN: 10000,
+  };
+  returnObj.settings = settings;
 
-    // Line map - [id => { audio }]
-    const lines = new Map();
-    returnObj.lines = lines;
-    // Rendering variables
-    const renderParams = {
-        loop: true, // Queue up call to "render" in "render" function?
-        update: true, // Update the canvas next render cycle?
-        caching: true, // Use caches to optimise rendering?
-        caches: {},
-        coords: [0, 0], // Actual mouse coordinates
-        graphCoords: [0, 0], // Coordinates on graph
-        dragging: false, // Is the user currently dragging the canvas?
-        dragData: { pos: undefined, apos: undefined }, // Record actual position and canvas position
-    };
-    returnObj.renderParams = renderParams;
-    // Populate caches data
-    renderParams.caches.line = { // Caches graph background along with all functions drawn
-        data: undefined,
-        update: true,
-        create() {
-            graph.sketch(); // Sketch all functions
-            graph.getLines().forEach(id => { // Error messages?
-                const line = graph.getLine(id), errEl = lines.get(id).errorEl;
-                if (errEl) {
-                  if (line.error) {
-                      errEl.hidden = false;
-                      errEl.title = line.emsg;
-                  } else {
-                      errEl.hidden = true;
-                  }
-                } else if (line.error) {
-                  console.warn(`Line ${id} :: ${line.emsg}`);
-                }
-            });
-            this.data = graph.ctx.getImageData(0, 0, graph.width, graph.height); // Cache data
-        },
-    };
-    renderParams.caches.shadeArea = {
-      data: undefined,
-      update: true,
-      create() {
-        lines.forEach((data, lineID) => {
-          if (data.shadeArea) {
-            const ldata = graph.getLine(lineID);
+  // Line map - [id => { audio }]
+  const lines = new Map();
+  returnObj.lines = lines;
+  // Item map for item list - { type, ... }[]
+  // -> { type: 'defint', lineID, a, b, val?, coords? } FOR DEFINITE INTEGRAL
+  const itemListItems = [];
+  returnObj.itemListItems = itemListItems;
+  // Rendering variables
+  const renderParams = {
+    loop: true, // Queue up call to "render" in "render" function?
+    update: true, // Update the canvas next render cycle?
+    caching: true, // Use caches to optimise rendering?
+    caches: {},
+    coords: [0, 0], // Actual mouse coordinates
+    graphCoords: [0, 0], // Coordinates on graph
+    dragging: false, // Is the user currently dragging the canvas?
+    dragData: { pos: undefined, apos: undefined }, // Record actual position and canvas position
+  };
+  returnObj.renderParams = renderParams;
+  // Populate caches data
+  renderParams.caches.line = { // Caches graph background along with all functions drawn
+    data: undefined,
+    update: true,
+    create() {
+      graph.sketch(); // Sketch all functions
+      graph.getLines().forEach(id => { // Error messages?
+        const line = graph.getLine(id), errEl = lines.get(id).errorEl;
+        if (errEl) {
+          if (line.error) {
+            errEl.hidden = false;
+            errEl.title = line.emsg;
+          } else {
+            errEl.hidden = true;
+          }
+        } else if (line.error) {
+          console.warn(`Line ${id} :: ${line.emsg}`);
+        }
+      });
+      this.data = graph.ctx.getImageData(0, 0, graph.width, graph.height); // Cache data
+    },
+  };
+  renderParams.caches.shadeArea = {
+    data: undefined,
+    update: true,
+    create() {
+      lines.forEach((data, lineID) => {
+        if (data.shadeArea) {
+          const ldata = graph.getLine(lineID);
+          graph.ctx.beginPath();
+          graph.ctx.fillStyle = (ldata.color ?? "#000000") + "35";
+          plotPath(graph.ctx, data.shadeArea);
+          graph.ctx.fill();
+        }
+      });
+      let repopulate = false;
+      itemListItems.forEach(data => {
+        if (data.type === "defint") {
+          const ldata = graph.getLine(data.lineID);
+          try {
+            const pbr = { path: [] }; // For pass-by-reference return values
+            data.val = data.b < data.a
+              ? -graphData.graph.getArea(data.lineID, data.b, data.a, graphData.settings.integrateLimitsN, pbr) // Flip limits and negate
+              : graphData.graph.getArea(data.lineID, data.a, data.b, graphData.settings.integrateLimitsN, pbr);
+            data.coords = pbr.path;
+          } catch (e) {
+            console.error(e);
+            data.val = undefined;
+            data.coords = [];
+            alert(`Unable to integrate line ID ${data.lineID} between ${data.a} and ${data.b}`);
+          }
+          repopulate = true; // Re-populate item list
+          // Draw area region
+          if (ldata.draw === undefined || ldata.draw) { // Don't both if line is not visible
             graph.ctx.beginPath();
-            graph.ctx.fillStyle = (ldata.color ?? "#000000") + "35";
-            plotPath(graph.ctx, data.shadeArea);
+            graph.ctx.fillStyle = (ldata?.color ?? "#000000") + "35";
+            plotPath(graph.ctx, data.coords);
             graph.ctx.fill();
           }
-        });
-        this.data = graph.ctx.getImageData(0, 0, graph.width, graph.height); // Cache data
-      }
-    };
-    renderParams.caches.points = { // Caches points of interest (Point[])
-        data: undefined,
-        update: true,
-        create() {
-            Point.roundDp = settings.displayDp;
-            graph.sketchPoints(); // Sketch all points
-            this.data = graph.ctx.getImageData(0, 0, graph.width, graph.height); // Cache data
-        },
-    };
-
-    // Render loop function
-    function render() {
-        if (renderParams.update) { // Update the canvas
-            const ctx = graph.ctx;
-            graph.clear(); // Clear canvas
-            let doneUpdate = false; // Keep track of previous updates -> if a previous cache was updated, update all caches after it
-            for (let name in renderParams.caches) {
-                const data = renderParams.caches[name];
-                if (!renderParams.caching || data.update || doneUpdate) { // Update cache
-                    data.create(); // Create new cache
-                    doneUpdate = true;
-                    data.update = false;
-                } else {
-                    ctx.putImageData(data.data, 0, 0); // Render image cache to canvas
-                }
-            }
-
-            // Render coordinates near mouse
-            if (settings.showCoords) {
-                ctx.beginPath();
-                ctx.fillStyle = "black";
-                ctx.arc(...renderParams.coords, 2, 0, 2*Math.PI);
-                ctx.fill();
-                ctx.font = '11px Arial';
-                ctx.fillText(`(${round(renderParams.graphCoords[0], settings.displayDp)}, ${round(renderParams.graphCoords[1], settings.displayDp)})`, renderParams.coords[0] + 5, renderParams.coords[1] - 5);
-            }
-
-            // Render traces if necessary
-            const originCoords = graph.getCoordinates(0, 0);
-            lines.forEach((data, id) => {
-              const line = graph.getLine(id);
-              if (line.draw && (data.traceX || data.traceY)) {
-                const TEXT_OFF = 5;
-                if (data.traceX) {
-                  const xstep = Math.abs(line.coords[1][0] - line.coords[0][0]) * 2;
-                  const online = getCorrepondingCoordinateIndex(renderParams.graphCoords[0], 'x', line.coords, true, settings.dpAccuracy) || [];
-                  graph.ctx.lineWidth = 1;
-                  online.forEach((i) => {
-                    graph.ctx.save();
-                    const [x, y] = line.coords[i];
-                    if (Math.abs(x - renderParams.graphCoords[0]) > xstep) return;
-                    const lineCoords = graph.getCoordinates(x, y);
-                    graph.ctx.beginPath();
-                    graph.ctx.moveTo(originCoords[0], renderParams.coords[1]);
-                    graph.ctx.lineTo(...renderParams.coords);
-                    graph.ctx.lineTo(...lineCoords);
-                    graph.ctx.stroke();
-                    graph.ctx.fillStyle = line.color;
-                    graph.ctx.beginPath();
-                    graph.ctx.arc(originCoords[0], renderParams.coords[1], 4, 0, 2*Math.PI);
-                    graph.ctx.arc(...lineCoords, 4, 0, 2*Math.PI);
-                    graph.ctx.fill();
-                    graph.ctx.fillText(y.toFixed(3), lineCoords[0] + TEXT_OFF, lineCoords[1] - TEXT_OFF);
-
-                    if (data.tangent) {
-                      let [nx, ny] = line.coords[i + 1] ?? line.coords[i - 1];
-                      let m = (ny - y) / (nx - x);
-                      let x1 = x - graph.opts.xstep / 2, x2 = nx + graph.opts.xstep / 2;
-                      let y1 = m * (x1 - x) + y, y2 = m * (x2 - nx) + ny;
-                      graph.ctx.beginPath();
-                      graph.ctx.strokeStyle = 'red';
-                      graph.ctx.moveTo(...graph.getCoordinates(x1, y1));
-                      graph.ctx.lineTo(...graph.getCoordinates(x2, y2));
-                      graph.ctx.stroke();
-                      graph.ctx.fillStyle = 'red';
-                      graph.ctx.fillText('m=' + m.toFixed(2), lineCoords[0] + TEXT_OFF, lineCoords[1] + TEXT_OFF);
-                    }
-                    graph.ctx.restore();
-                  });
-                }
-                if (data.traceY) {
-                  const ystep = Math.abs(line.coords[1][1] - line.coords[0][1]) * 5;
-                  const online = getCorrepondingCoordinateIndex(renderParams.graphCoords[1], 'y', line.coords, true, settings.dpAccuracy) || [];
-                  graph.ctx.lineWidth = 1;
-                  online.forEach(i => {
-                    graph.ctx.save();
-                    const [x, y] = line.coords[i];
-                    if (Math.abs(y - renderParams.graphCoords[1]) > ystep) return;
-                    const lineCoords = graph.getCoordinates(x, y);
-                    graph.ctx.beginPath();
-                    graph.ctx.moveTo(renderParams.coords[0], originCoords[1]);
-                    graph.ctx.lineTo(...renderParams.coords);
-                    graph.ctx.lineTo(...lineCoords);
-                    graph.ctx.stroke();
-                    graph.ctx.fillStyle = line.color;
-                    graph.ctx.beginPath();
-                    graph.ctx.arc(renderParams.coords[0], originCoords[1], 4, 0, 2*Math.PI);
-                    graph.ctx.arc(...lineCoords, 4, 0, 2*Math.PI);
-                    graph.ctx.fill();
-                    graph.ctx.fillText(x.toFixed(3), lineCoords[0] + 5, lineCoords[1] - 5);
-
-                    if (data.tangent) {
-                      let [nx, ny] = line.coords[i + 1] ?? line.coords[i - 1];
-                      let m = (ny - y) / (nx - x);
-                      let y1 = y - graph.opts.ystep / 2, y2 = ny + graph.opts.ystep / 2;
-                      let x1 = (y1 - y + m * x) / m, x2 = (y2 - ny + m * nx) / m;
-                      graph.ctx.beginPath();
-                      graph.ctx.strokeStyle = 'red';
-                      graph.ctx.moveTo(...graph.getCoordinates(x1, y1));
-                      graph.ctx.lineTo(...graph.getCoordinates(x2, y2));
-                      graph.ctx.stroke();
-                      graph.ctx.fillStyle = 'red';
-                      graph.ctx.fillText('m=' + m.toFixed(2), lineCoords[0] + TEXT_OFF, lineCoords[1] + TEXT_OFF);
-                    }
-                    graph.ctx.restore();
-                  });
-                }
-              }
-            });
-
-            renderParams.update = false;
         }
-        if (renderParams.loop) requestAnimationFrame(render);
+      });
+      if (repopulate) populateItemList(itemListContainer, graphData, analysisOptionsDiv); // Update any changes
+      this.data = graph.ctx.getImageData(0, 0, graph.width, graph.height); // Cache data
     }
-    returnObj.render = render;
+  };
+  renderParams.caches.points = { // Caches points of interest (Point[])
+    data: undefined,
+    update: true,
+    create() {
+      Point.roundDp = settings.displayDp;
+      graph.sketchPoints(); // Sketch all points
+      this.data = graph.ctx.getImageData(0, 0, graph.width, graph.height); // Cache data
+    },
+  };
 
-    // Function to add events
-    function addEvents() {
-        graph.addEvents({
-            mousemove(e) {
-                renderParams.coords = extractCoords(e); // Get coordinates of mouse relative to the canvas
-                renderParams.graphCoords = graph.fromCoordinates(...renderParams.coords); // Get graph coordinates
+  // Render loop function
+  function render() {
+    if (renderParams.update) { // Update the canvas
+      const ctx = graph.ctx;
+      graph.clear(); // Clear canvas
+      let doneUpdate = false; // Keep track of previous updates -> if a previous cache was updated, update all caches after it
+      for (let name in renderParams.caches) {
+        const data = renderParams.caches[name];
+        if (!renderParams.caching || data.update || doneUpdate) { // Update cache
+          data.create(); // Create new cache
+          doneUpdate = true;
+          data.update = false;
+        } else {
+          ctx.putImageData(data.data, 0, 0); // Render image cache to canvas
+        }
+      }
 
-                let shadeAreaUpdate = false;
-                lines.forEach((data, id) => {
-                  if (data.shadeArea) {
-                    shadeAreaUpdate = true;
-                    delete data.shadeArea;
-                  }
-                });
-                if (shadeAreaUpdate) {
-                  renderParams.caches.shadeArea.update = true;
-                  renderParams.update = true;
-                }
+      // Render coordinates near mouse
+      if (settings.showCoords) {
+        ctx.beginPath();
+        ctx.fillStyle = "black";
+        ctx.arc(...renderParams.coords, 2, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.font = '11px Arial';
+        ctx.fillText(`(${round(renderParams.graphCoords[0], settings.displayDp)}, ${round(renderParams.graphCoords[1], settings.displayDp)})`, renderParams.coords[0] + 5, renderParams.coords[1] - 5);
+      }
 
-                if (settings.showCoords) renderParams.update = true; // Issue update to update mouse coords
-                if (renderParams.dragging) { // The canvas is being dragged...
-                    // Translate canvas
-                    graph.opts.xstart -= renderParams.graphCoords[0] - renderParams.dragData.apos[0];
-                    graph.opts.ystart -= renderParams.graphCoords[1] - renderParams.dragData.apos[1];
-                    renderParams.caches.line.update = true; // Update line cache as graph has changed
-                    renderParams.update = true;
-                }
+      // Render traces if necessary
+      const originCoords = graph.getCoordinates(0, 0);
+      lines.forEach((data, id) => {
+        const line = graph.getLine(id);
+        if (line.draw && (data.traceX || data.traceY)) {
+          const TEXT_OFF = 5;
+          if (data.traceX) {
+            const xstep = Math.abs(line.coords[1][0] - line.coords[0][0]) * 2;
+            const online = getCorrepondingCoordinateIndex(renderParams.graphCoords[0], 'x', line.coords, true, settings.dpAccuracy) || [];
+            graph.ctx.lineWidth = 1;
+            online.forEach((i) => {
+              graph.ctx.save();
+              const [x, y] = line.coords[i];
+              if (Math.abs(x - renderParams.graphCoords[0]) > xstep) return;
+              const lineCoords = graph.getCoordinates(x, y);
+              graph.ctx.beginPath();
+              graph.ctx.moveTo(originCoords[0], renderParams.coords[1]);
+              graph.ctx.lineTo(...renderParams.coords);
+              graph.ctx.lineTo(...lineCoords);
+              graph.ctx.stroke();
+              graph.ctx.fillStyle = line.color;
+              graph.ctx.beginPath();
+              graph.ctx.arc(originCoords[0], renderParams.coords[1], 4, 0, 2 * Math.PI);
+              graph.ctx.arc(...lineCoords, 4, 0, 2 * Math.PI);
+              graph.ctx.fill();
+              graph.ctx.fillText(y.toFixed(3), lineCoords[0] + TEXT_OFF, lineCoords[1] - TEXT_OFF);
 
-                // Hover over any points?
-                let flagChange = false;
-                const pr = graph.fromCoordinates(Point.radius + 1, 0)[0] - graph.fromCoordinates(0, 0)[0];
-                graph._points.forEach(p => {
-                    if (p.flag) {
-                        p.flag = false;
-                        flagChange = true;
-                    }
-                    if (renderParams.graphCoords[0] > p.x - pr && renderParams.graphCoords[0] <= p.x + pr && renderParams.graphCoords[1] > p.y - pr && renderParams.graphCoords[1] <= p.y + pr) {
-                        p.flag = true;
-                        flagChange = true;
-                    }
-                });
-                if (flagChange) {
-                    renderParams.caches.points.update = true; // Update points cache as state of point(s) has changed
-                    renderParams.update = true;
-                }
-            },
+              if (data.tangent) {
+                let [nx, ny] = line.coords[i + 1] ?? line.coords[i - 1];
+                let m = (ny - y) / (nx - x);
+                let x1 = x - graph.opts.xstep / 2, x2 = nx + graph.opts.xstep / 2;
+                let y1 = m * (x1 - x) + y, y2 = m * (x2 - nx) + ny;
+                graph.ctx.beginPath();
+                graph.ctx.strokeStyle = 'red';
+                graph.ctx.moveTo(...graph.getCoordinates(x1, y1));
+                graph.ctx.lineTo(...graph.getCoordinates(x2, y2));
+                graph.ctx.stroke();
+                graph.ctx.fillStyle = 'red';
+                graph.ctx.fillText('m=' + m.toFixed(2), lineCoords[0] + TEXT_OFF, lineCoords[1] + TEXT_OFF);
+              }
+              graph.ctx.restore();
+            });
+          }
+          if (data.traceY) {
+            const ystep = Math.abs(line.coords[1][1] - line.coords[0][1]) * 5;
+            const online = getCorrepondingCoordinateIndex(renderParams.graphCoords[1], 'y', line.coords, true, settings.dpAccuracy) || [];
+            graph.ctx.lineWidth = 1;
+            online.forEach(i => {
+              graph.ctx.save();
+              const [x, y] = line.coords[i];
+              if (Math.abs(y - renderParams.graphCoords[1]) > ystep) return;
+              const lineCoords = graph.getCoordinates(x, y);
+              graph.ctx.beginPath();
+              graph.ctx.moveTo(renderParams.coords[0], originCoords[1]);
+              graph.ctx.lineTo(...renderParams.coords);
+              graph.ctx.lineTo(...lineCoords);
+              graph.ctx.stroke();
+              graph.ctx.fillStyle = line.color;
+              graph.ctx.beginPath();
+              graph.ctx.arc(renderParams.coords[0], originCoords[1], 4, 0, 2 * Math.PI);
+              graph.ctx.arc(...lineCoords, 4, 0, 2 * Math.PI);
+              graph.ctx.fill();
+              graph.ctx.fillText(x.toFixed(3), lineCoords[0] + 5, lineCoords[1] - 5);
 
-            mousedown(e) {
-                renderParams.dragging = true; // We are now panning the canvas
-                renderParams.dragData.pos = extractCoords(e); // Get current coordinates
-                renderParams.dragData.apos = graph.fromCoordinates(...renderParams.dragData.pos); // Get graph coordinates
-            },
+              if (data.tangent) {
+                let [nx, ny] = line.coords[i + 1] ?? line.coords[i - 1];
+                let m = (ny - y) / (nx - x);
+                let y1 = y - graph.opts.ystep / 2, y2 = ny + graph.opts.ystep / 2;
+                let x1 = (y1 - y + m * x) / m, x2 = (y2 - ny + m * nx) / m;
+                graph.ctx.beginPath();
+                graph.ctx.strokeStyle = 'red';
+                graph.ctx.moveTo(...graph.getCoordinates(x1, y1));
+                graph.ctx.lineTo(...graph.getCoordinates(x2, y2));
+                graph.ctx.stroke();
+                graph.ctx.fillStyle = 'red';
+                graph.ctx.fillText('m=' + m.toFixed(2), lineCoords[0] + TEXT_OFF, lineCoords[1] + TEXT_OFF);
+              }
+              graph.ctx.restore();
+            });
+          }
+        }
+      });
 
-            mouseup(e) {
-                renderParams.dragging = false; // No longer panning the canvas
-            },
+      renderParams.update = false;
+    }
+    if (renderParams.loop) requestAnimationFrame(render);
+  }
+  returnObj.render = render;
 
-            wheel(e) {
-                const k = e.deltaY < 0 ? 1.1 : 0.9; // Scroll factor
-                e.preventDefault(); // Prevent page from scrolling
-                graph.opts.ystepGap *= k;
-                graph.opts.xstepGap *= k;
-                if (graph.opts.xstepGap < graph.width / 14) {
-                  graph.opts.xstepGap *= 2;
-                  graph.opts.xstep *= 2;
-                } else if (graph.opts.xstepGap > graph.width / 7) {
-                  graph.opts.xstepGap /= 2;
-                  graph.opts.xstep /= 2;
-                }
-                if (graph.opts.ystepGap < graph.height / 14) {
-                  graph.opts.ystepGap *= 2;
-                  graph.opts.ystep *= 2;
-                } else if (graph.opts.ystepGap > graph.height / 7) {
-                  graph.opts.ystepGap /= 2;
-                  graph.opts.ystep /= 2;
-                }
-                renderParams.caches.line.update = true;
-                renderParams.update = true;
-            }
+  // Function to add events
+  function addEvents() {
+    graph.addEvents({
+      mousemove(e) {
+        renderParams.coords = extractCoords(e); // Get coordinates of mouse relative to the canvas
+        renderParams.graphCoords = graph.fromCoordinates(...renderParams.coords); // Get graph coordinates
+
+        let shadeAreaUpdate = false;
+        lines.forEach((data, id) => {
+          if (data.shadeArea) {
+            shadeAreaUpdate = true;
+            delete data.shadeArea;
+          }
         });
-    }
-    returnObj.addEvents = addEvents;
+        if (shadeAreaUpdate) {
+          renderParams.caches.shadeArea.update = true;
+          renderParams.update = true;
+        }
 
-    // Constant map
-    const constants = new Map(); // constant: string => { value: number, step: number }
-    returnObj.constants = constants;
-    // Common constants
-    globalThis.pi = Math.PI;
-    globalThis.e = Math.E;
+        if (settings.showCoords) renderParams.update = true; // Issue update to update mouse coords
+        if (renderParams.dragging) { // The canvas is being dragged...
+          // Translate canvas
+          graph.opts.xstart -= renderParams.graphCoords[0] - renderParams.dragData.apos[0];
+          graph.opts.ystart -= renderParams.graphCoords[1] - renderParams.dragData.apos[1];
+          renderParams.caches.line.update = true; // Update line cache as graph has changed
+          renderParams.update = true;
+        }
 
-    // Function map
-    const funcs = new Map(); // funcname: string => { fn: Function, args: string[], source: string, visible: boolean }
-    returnObj.funcs = funcs;
+        // Hover over any points?
+        let flagChange = false;
+        const pr = graph.fromCoordinates(Point.radius + 1, 0)[0] - graph.fromCoordinates(0, 0)[0];
+        graph._points.forEach(p => {
+          if (p.flag) {
+            p.flag = false;
+            flagChange = true;
+          }
+          if (renderParams.graphCoords[0] > p.x - pr && renderParams.graphCoords[0] <= p.x + pr && renderParams.graphCoords[1] > p.y - pr && renderParams.graphCoords[1] <= p.y + pr) {
+            p.flag = true;
+            flagChange = true;
+          }
+        });
+        if (flagChange) {
+          renderParams.caches.points.update = true; // Update points cache as state of point(s) has changed
+          renderParams.update = true;
+        }
+      },
 
-    return returnObj;
+      mousedown(e) {
+        renderParams.dragging = true; // We are now panning the canvas
+        renderParams.dragData.pos = extractCoords(e); // Get current coordinates
+        renderParams.dragData.apos = graph.fromCoordinates(...renderParams.dragData.pos); // Get graph coordinates
+      },
+
+      mouseup(e) {
+        renderParams.dragging = false; // No longer panning the canvas
+      },
+
+      wheel(e) {
+        const k = e.deltaY < 0 ? 1.1 : 0.9; // Scroll factor
+        e.preventDefault(); // Prevent page from scrolling
+        graph.opts.ystepGap *= k;
+        graph.opts.xstepGap *= k;
+        if (graph.opts.xstepGap < graph.width / 14) {
+          graph.opts.xstepGap *= 2;
+          graph.opts.xstep *= 2;
+        } else if (graph.opts.xstepGap > graph.width / 7) {
+          graph.opts.xstepGap /= 2;
+          graph.opts.xstep /= 2;
+        }
+        if (graph.opts.ystepGap < graph.height / 14) {
+          graph.opts.ystepGap *= 2;
+          graph.opts.ystep *= 2;
+        } else if (graph.opts.ystepGap > graph.height / 7) {
+          graph.opts.ystepGap /= 2;
+          graph.opts.ystep /= 2;
+        }
+        renderParams.caches.line.update = true;
+        renderParams.update = true;
+      }
+    });
+  }
+  returnObj.addEvents = addEvents;
+
+  // Constant map
+  const constants = new Map(); // constant: string => { value: number, step: number }
+  returnObj.constants = constants;
+  // Common constants
+  globalThis.pi = Math.PI;
+  globalThis.e = Math.E;
+
+  // Function map
+  const funcs = new Map(); // funcname: string => { fn: Function, args: string[], source: string, visible: boolean }
+  returnObj.funcs = funcs;
+
+  return returnObj;
 }
 
 /** Add a line to the graph. Return line ID. */
@@ -666,6 +698,7 @@ function removeFunction(graphData, name) {
 function populateItemList(listEl, graphData, analysisOptionsDiv) {
   listEl.innerHTML = ""; // Clear element
 
+  // LINES
   graphData.lines.forEach((obj, id) => {
     const card = generateLineCard(id, graphData, analysisOptionsDiv, listEl, () => {
       card.remove();
@@ -674,17 +707,198 @@ function populateItemList(listEl, graphData, analysisOptionsDiv) {
     listEl.appendChild(card);
   });
 
+  // CONSTANTS
   graphData.constants.forEach((_, name) => {
     const card = generateConstantCard(name, graphData, n => {
       graphData.renderParams.caches.line.update = true;
       graphData.renderParams.update = true;
-    },() => {
+    }, () => {
       card.remove();
       graphData.renderParams.caches.line.update = true;
       graphData.renderParams.update = true;
     });
     listEl.appendChild(card);
   });
+
+  // OTHER
+  graphData.itemListItems.forEach((data, id) => {
+    let card;
+    if (data.type === "defint") card = generateDefiniteIntegralCard(data, graphData, () => {
+      data.update = true;
+      graphData.renderParams.caches.shadeArea.update = true;
+      graphData.renderParams.update = true;
+    }, () => {
+      card.remove();
+      graphData.renderParams.caches.shadeArea.update = true;
+      graphData.renderParams.update = true;
+    });
+    if (card) listEl.appendChild(card);
+  });
+}
+
+/** Given line type, return definite integral info */
+const getDefiniteIntegralData = lineType => {
+  switch (lineType) {
+    case 'x':
+      return { symbol: 'x', html: '&xscr;', desc: 'Find area under curve between x=a, x=b and the x-axis' };
+    case 'y':
+      return { symbol: 'y', html: '&yscr;', desc: 'Find area under curve between y=a, y=b and the y-axis' };
+    case 'p':
+      return { symbol: 'p', html: '&rho;', desc: 'Find area under curve between p=a, p=b and the x-axis' };
+    case 'θ':
+      return { symbol: 'θ', html: '&theta;', desc: 'Find area bounded by the curve and the half-lines θ=a and θ=b in radians' };
+    default:
+      return { symbol: 'x', html: '&xscr;', desc: 'Find area under curve between x=a and x=b' };
+  }
+};
+
+function generateDefiniteIntegralCard(data, graphData, onUpdate, onRemove) {
+  const card = document.createElement("div");
+  card.classList.add("card", "definite-integral-card");
+  const span = document.createElement("span");
+  card.appendChild(span);
+  span.insertAdjacentHTML("beforeend", `&int;(line `);
+  let DIDATA, spanSymbols = [];
+
+  const updateDIData = () => {
+    DIDATA = getDefiniteIntegralData(graphData.graph.getLine(data.lineID)?.type);
+    spanSymbols.forEach((el) => (el.innerHTML = DIDATA.html));
+    span.title = DIDATA.desc;
+  };
+  const updateInputStep = () => {
+    inputLimitA.step = data.step;
+    inputLimitB.step = data.step;
+  };
+
+  // Enter line ID to integrate
+  let inputLineID = document.createElement("input");
+  inputLineID.type = "text";
+  inputLineID.value = data.lineID;
+  inputLineID.style.width = "10px";
+  inputLineID.addEventListener('change', () => {
+    const id = +inputLineID.value;
+    data.lineID = id;
+    updateDIData();
+    onUpdate();
+  });
+  span.appendChild(inputLineID);
+  span.insertAdjacentHTML("beforeend", `)d`);
+  span.appendChild(spanSymbols[0] = document.createElement("span"));
+  span.insertAdjacentHTML("beforeend", ` between `);
+
+  // Limit A
+  span.appendChild(spanSymbols[1] = document.createElement("span"));
+  span.insertAdjacentHTML("beforeend", ` = `);
+  let inputLimitA = document.createElement("input");
+  inputLimitA.type = "number";
+  inputLimitA.value = data.a;
+  inputLimitA.addEventListener('change', () => {
+    data.a = +inputLimitA.value;
+    onUpdate();
+  });
+  span.appendChild(inputLimitA);
+  span.insertAdjacentHTML("beforeend", `, `);
+
+  // Limit B
+  span.appendChild(spanSymbols[2] = document.createElement("span"));
+  span.insertAdjacentHTML("beforeend", ` = `);
+  let inputLimitB = document.createElement("input");
+  inputLimitB.type = "number";
+  inputLimitB.value = data.b;
+  inputLimitB.addEventListener('change', () => {
+    data.b = +inputLimitB.value;
+    onUpdate();
+  });
+  span.appendChild(inputLimitB);
+
+  // Answer
+  span.insertAdjacentHTML("beforeend", ` = `);
+  span.insertAdjacentHTML("beforeend", `<var>${typeof data.val === "number" && !isNaN(data.val) ? data.val : "?"}</var>`);
+
+  const divButtons = document.createElement("div");
+  divButtons.classList.add("buttons-container");
+  card.appendChild(divButtons);
+
+  // Btn to edit in detail
+  const btnEdit = document.createElement('button');
+  btnEdit.innerHTML = '&#9998;';
+  btnEdit.title = 'Edit';
+  btnEdit.classList.add("btn-edit");
+  btnEdit.addEventListener('click', () => {
+    const popup = new Popup("Definite Integral");
+    popup.insertAdjacentHTML("beforeend", `<p>${DIDATA.desc}<br><em>Entering numerical expressions is permitted</em></p>`);
+
+    // Limit A
+    let p = document.createElement("p");
+    popup.insertAdjacentElement("beforeend", p);
+    p.insertAdjacentHTML("beforeend", `${DIDATA.html} = &ascr; = `);
+    let p_inputLimitA = document.createElement("input");
+    p_inputLimitA.type = "text";
+    p_inputLimitA.value = data.a;
+    p_inputLimitA.addEventListener('change', () => {
+      try {
+        data.a = +eval(p_inputLimitA.value);
+      } catch (e) {
+        alert(e.message);
+      }
+      p_inputLimitA.value = data.a;
+    });
+    p.appendChild(p_inputLimitA);
+
+    // Limit B
+    p = document.createElement("p");
+    popup.insertAdjacentElement("beforeend", p);
+    p.insertAdjacentHTML("beforeend", `${DIDATA.html} = &bscr; = `);
+    let p_inputLimitB = document.createElement("input");
+    p_inputLimitB.type = "text";
+    p_inputLimitB.value = data.b;
+    p_inputLimitB.addEventListener('change', () => {
+      try {
+        data.b = +eval(p_inputLimitB.value);
+      } catch (e) {
+        alert(e.message);
+      }
+      p_inputLimitB.value = data.b;
+    });
+    p.appendChild(p_inputLimitB);
+
+    // Input step
+    p = document.createElement("p");
+    popup.insertAdjacentElement("beforeend", p);
+    p.insertAdjacentHTML("beforeend", `Number input's step = `);
+    let p_inputStep = document.createElement("input");
+    p_inputStep.type = "text";
+    p_inputStep.value = data.step;
+    p_inputStep.addEventListener('change', () => {
+      try {
+        data.step = +eval(p_inputStep.value);
+        updateInputStep();
+      } catch (e) {
+        alert(e.message);
+      }
+      p_inputStep.value = data.step;
+    });
+    p.appendChild(p_inputStep);
+
+    popup.setCloseCallback(onUpdate);
+    popup.show();
+  });
+  divButtons.appendChild(btnEdit);
+
+  // Button to remove
+  const btnRemove = document.createElement("button");
+  btnRemove.innerHTML = '&times;';
+  btnRemove.classList.add("btn-remove");
+  btnRemove.addEventListener("click", () => {
+    const i = graphData.itemListItems.indexOf(data);
+    if (i !== -1) graphData.itemListItems.splice(i, 1);
+    onRemove();
+  });
+  divButtons.appendChild(btnRemove);
+
+  updateDIData();
+  updateInputStep();
+  return card;
 }
 
 /** Given name of a constant, generate a Card */
@@ -783,7 +997,7 @@ function generateLineCard(lineID, graphData, analysisOptionsDiv, itemListContain
     divOverview = generateLineCardOverview(lineID, lineData, graphData, updateLineData);
     errEl.insertAdjacentElement("afterend", divOverview);
   }
-  
+
   // Line type
   const spanType = document.createElement("span");
   spanType.classList.add("line-type");
@@ -858,18 +1072,11 @@ function generateLineCard(lineID, graphData, analysisOptionsDiv, itemListContain
 
   // button: draw line?
   lineData.draw = lineData.draw === undefined || lineData.draw;
-  const updateBtnDraw = () => {
-    btnDraw.innerHTML = lineData.draw ? '<span class="cross-out">&#x1f441;</span>' : '<span>&#x1f441;</span>';
-    btnDraw.title = lineData.draw ? 'Hide line' : 'Show line';
-  };
-  const btnDraw = document.createElement('button');
-  updateBtnDraw();
-  btnDraw.addEventListener('click', () => {
+  divButtons.appendChild(generateToggleVisibleButton(lineData.draw, () => {
     lineData.draw = !lineData.draw;
-    updateBtnDraw();
     updateLineData();
-  });
-  divButtons.appendChild(btnDraw);
+    return lineData.draw;
+  }));
 
   // Button to remove line
   const btnRemove = document.createElement("button");
@@ -886,6 +1093,18 @@ function generateLineCard(lineID, graphData, analysisOptionsDiv, itemListContain
   divButtons.appendChild(btnRemove);
 
   return card;
+}
+
+/** Toggle button which toggles a value - visibility (shows eye) */
+function generateToggleVisibleButton(initial, onClick) {
+  const update = value => {
+    btn.innerHTML = value ? '<span class="cross-out">&#x1f441;</span>' : '<span>&#x1f441;</span>';
+    btn.title = value ? 'Hide line' : 'Show line';
+  };
+  const btn = document.createElement('button');
+  update(initial);
+  btn.addEventListener('click', () => update(onClick()));
+  return btn;
 }
 
 /** Generate DIV which contains an overview of line data (used in .line-card) */
@@ -1062,7 +1281,7 @@ function generateConfigPopup(graphData, onUpdateItemList, onChange) {
     { field: 'Sub-Grid Divs', col: 2, title: 'Divisions inside each x/y-axis step', type: 'number', get: () => graphData.graph.opts.subGridDivs, set: v => graphData.graph.opts.subGridDivs = v },
     { field: 'Line Width', col: 2, title: 'Line width of each line function', type: 'number', min: 0, get: () => graphData.graph.opts.lineWidth, set: v => graphData.graph.opts.lineWidth = +v },
     { field: 'Show Coords', col: 2, title: 'Show approx. coordinates next to cursor', type: 'boolean', get: () => graphData.settings.showCoords, set: v => graphData.settings.showCoords = v },
-    
+
     { field: '&Nscr;-Coords', col: 3, title: 'Number of coordinat points to plot for each line function (directly impacts performance)', type: 'number', get: () => graphData.graph.opts.ncoords, set: v => graphData.graph.opts.ncoords = +v },
     { field: 'Approx. Acc.', col: 3, title: 'Accuracy (decimal places) of approximations i.e. finding roots', type: 'number', get: () => graphData.settings.dpAccuracy, set: v => graphData.settings.dpAccuracy = v },
     { field: 'Display Acc.', col: 3, title: 'Accuracy (decimal places) to round coordinates to when displayed', type: 'number', get: () => graphData.settings.displayDp, set: v => graphData.settings.displayDp = v },
@@ -1852,21 +2071,25 @@ function populateLineAnalysisDiv(parent, graphData, lineID, itemListContainer) {
   }));
   // Integrate between limits
   divCalculus.appendChild(createButton("&int;<span class=\"sub-sup\"><sup>b</sup><sub>a</sub></span>&nbsp;&nbsp;&nbsp;", "Integrate between limits - find area under curve", () => {
-    let bounds = prompt(`Find area under curve between bounds\nFormat: <a>, <b>`, '0, 1');
-    if (bounds) {
-      let [a, b] = bounds.split(',').map(n => eval(n));
-      if (b < a) return alert(`Invalid bound relationship`);
-      let obj = { path: undefined };
-      let area = graphData.graph.getArea(lineID, a, b, graphData.settings.integrateLimitsN, obj);
-      if (area === undefined) alert(`Area ${a}-${b} is undefined`);
-      else if (isNaN(area)) alert(`Unable to calculate area ${a}-${b}`);
-      else { 
-        alert(area);
-        graphData.lines.get(lineID).shadeArea = obj.path;
-        graphData.renderParams.caches.shadeArea.update = true;
-        graphData.renderParams.update = true;
-      }
-    }
+    // let bounds = prompt(`Find area under curve between bounds\nFormat: <a>, <b>`, '0, 1');
+    // if (bounds) {
+    //   let [a, b] = bounds.split(',').map(n => eval(n));
+    //   if (b < a) return alert(`Invalid bound relationship`);
+    //   let obj = { path: undefined };
+    //   let area = graphData.graph.getArea(lineID, a, b, graphData.settings.integrateLimitsN, obj);
+    //   if (area === undefined) alert(`Area ${a}-${b} is undefined`);
+    //   else if (isNaN(area)) alert(`Unable to calculate area ${a}-${b}`);
+    //   else {
+    //     alert(area);
+    //     graphData.lines.get(lineID).shadeArea = obj.path;
+    //     graphData.renderParams.caches.shadeArea.update = true;
+    //     graphData.renderParams.update = true;
+    //   }
+    // }
+    graphData.itemListItems.push({ type: "defint", lineID, a: 0, b: 1, step: 0.5 });
+    populateItemList(itemListContainer, graphData, parent);
+    graphData.renderParams.caches.shadeArea.update = true;
+    graphData.renderParams.update = true;
   }));
   // Approximate
   divCalculus.appendChild(createButton("~", "Approximate function using Taylor series", () => {
@@ -1956,7 +2179,7 @@ function populateLineAnalysisDiv(parent, graphData, lineID, itemListContainer) {
   parent.appendChild(divSound);
   divSound.insertAdjacentHTML("beforeend", "<abbr title='Play function as sound'>&#x1f50a;</abbr> ");
   input = document.createElement('input');
-  input.checked = graphData.lines.get(lineID).audio !== undefined; 
+  input.checked = graphData.lines.get(lineID).audio !== undefined;
   input.type = 'checkbox';
   input.addEventListener('change', async e => {
     const data = graphData.lines.get(lineID);

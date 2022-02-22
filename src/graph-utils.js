@@ -1,6 +1,6 @@
 /** Utility functions used by Graph.js */
 
-import { lerp } from "./utils.js";
+import { inRange, lerp } from "./utils.js";
 
 /** Calculate coordinates of change of gradient (differentiation) */
 export function calcGradient(coords) {

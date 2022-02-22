@@ -63,12 +63,14 @@ export function circle(ctx, x, y, r, fillStyle = undefined) {
 
 /** Plot a path */
 export function plotPath(ctx, points) {
-  ctx.moveTo(...points[0]);
-  for (let i = 1; i < points.length; ++i) ctx.lineTo(...points[i]);
+  if (points.length > 1) {
+    ctx.moveTo(...points[0]);
+    for (let i = 1; i < points.length; ++i) ctx.lineTo(...points[i]);
+  }
 }
 
 /** Create an HTML button */
-export function createButton(innerHTML, title=undefined, onClick=undefined) {
+export function createButton(innerHTML, title = undefined, onClick = undefined) {
   const btn = document.createElement('button');
   btn.innerHTML = innerHTML;
   if (title) btn.title = title;

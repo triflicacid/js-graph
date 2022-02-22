@@ -686,6 +686,7 @@ export class Graph {
    * @returns numerical area
    */
   getArea(id, a, b, n = 10000, obj = undefined) {
+    if (a === b) return 0;
     const line = this._lines.get(id);
     line.color ??= "#000000";
     if (line === undefined) return NaN;

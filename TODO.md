@@ -1,4 +1,3 @@
 - Assymptotes
 - Option to combine line shaded regions and only shade the combined region
-- Integration between limits - info popup
 - Add more info to README
