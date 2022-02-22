@@ -1,5 +1,6 @@
 import { Point } from "./Point.js";
-import { HEX_ALPHA, calcCoordsFromGradient, calcGradient, extractChangeOfSign, getAsymptotes, getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getIntercepts, lerpCoords, roundMultiple, roundTowards0, taylorApprox, getMaxPoints, getMinPoints, roundTowardsInf } from "./utils.js";
+import { lerpCoords, plotPath, roundMultiple, roundTowards0, roundTowardsInf } from "./utils.js";
+import * as gutils from "./graph-utils.js";
 
 export class Graph {
   constructor(canvas, eventListenerEl) {
@@ -402,12 +403,12 @@ export class Graph {
             }
             break;
           case 'd': { // Plot gradient of another function
-            coords = calcGradient(refLine.coords);
+            coords = gutils.calcGradient(refLine.coords);
             break;
           }
           case 'i': { // Plot integrand of another function
             data.C ??= 0;
-            coords = calcCoordsFromGradient(refLine.coords, data.C);
+            coords = gutils.calcCoordsFromGradient(refLine.coords, data.C);
             break;
           }
           case 'a':
@@ -565,7 +566,7 @@ export class Graph {
     const line = this._lines.get(id);
     if (line) {
       const coords = line.coords && !genNewCoords ? line.coords : this.generateCoords(id, opts);
-      return calcGradient(coords);
+      return gutils.calcGradient(coords);
     } else {
       return false;
     }
@@ -576,7 +577,7 @@ export class Graph {
     const line = this._lines.get(id);
     if (line) {
       const coords = line.coords && !genNewCoords ? line.coords : this.generateCoords(id, opts);
-      return calcCoordsFromGradient(coords);
+      return gutils.calcCoordsFromGradient(coords);
     } else {
       return false;
     }
@@ -652,7 +653,7 @@ export class Graph {
     const DP = 5;
     const axisIndex = axis === 'x' ? 0 : 1, otherAxisIndex = axisIndex ? 0 : 1;
     const coords = Array.isArray(id) ? id : this.getLine(id).coords;
-    let intercepts = extractChangeOfSign(coords, otherAxisIndex, DP);
+    let intercepts = gutils.extractChangeOfSign(coords, otherAxisIndex, DP);
     lerpCoords(intercepts, 0.5);
     return intercepts;
   }
@@ -663,61 +664,145 @@ export class Graph {
     if (line) {
       // if (line.type !== 'x' && line.type !== 'y') return console.error(`Cannot find turning points of line of type ${line.type}`);
       let coords = line.coords ?? this.generateCoords(id);
-      let mcoords = calcGradient(coords);
+      let mcoords = gutils.calcGradient(coords);
       let roots = this.getAxisIntercept(mcoords, 'x', iterations, divs);
       roots.forEach(([rx, ry]) => {
-        let subPoints = getCorrespondingCoordinate(rx, 'x', coords, true);
+        let subPoints = gutils.getCorrespondingCoordinate(rx, 'x', coords, true);
         points.push(...subPoints);
       });
     }
     return points;
   }
 
-  /** Calculate area under curve <ID> (or where <ID> is coordinate array) between <a> and <b> */
-  getArea(id, a, b, n = 10000) {
-    if (Array.isArray(id)) {
-      let coords = [], secStart = getCorrepondingCoordinateIndex(a, 'x', id, false), secEnd = getCorrepondingCoordinateIndex(b, 'x', id, false);
-      coords = secStart <= secEnd ? id.slice(secStart, secEnd + 1) : id.slice(secEnd, secStart + 1);
-      n = coords.length;
-      let h = (b - a) / n, mid = 0;
-      for (let i = 1; i < coords.length - 1; ++i) {
-        mid += coords[i][1];
-      }
-      let A = 0.5 * h * ((coords[0][1] + coords[coords.length - 1][1]) + 2 * mid);
-      return A;
-    } else {
-      const line = this._lines.get(id);
-      if (line) {
-        if (line.type !== 'x') {
-          console.error(`Cannot find area under line of type '${line.type}'`);
-          return NaN;
-        }
+  /** Calculate area under curve <ID> between x=<a> and x=<b>
+   * If function privided we can work with, <n> is number of divisions to use, UNLESS <n>=-1, in which case use coord array
+   * - x => Use f(x) to generate <n> trapeziums
+   * - y => Use f(y) to generate <n> trapeziums
+   * - θ => Use f(θ) to generate <n> triangles
+   * - p => Use f(p) to generate <n> trapeziums
+   * Else, use coordinate array
+   * obj = { path: number[][] }
+   *  - Populate property <path> with coordinate array
+   * @returns numerical area
+   */
+  getArea(id, a, b, n = 10000, obj = undefined) {
+    const line = this._lines.get(id);
+    line.color ??= "#000000";
+    if (line === undefined) return NaN;
+    if (n !== -1) {
+      if (line.type === 'x') {
         const h = (b - a) / n, coords = [];
-        for (let x = a; x <= b; x += h) {
+        for (let x = a; x <= b; x += h) { // Generate coordinates
           let y = line.fn(x);
           if (Graph.validCoordinates(x, y)) coords.push([x, y]);
         }
-        let mid = 0;
-        for (let i = 1; i < coords.length - 1; ++i) mid += coords[i][1];
-        let A = 0.5 * h * ((coords[0][1] + coords[coords.length - 1][1]) + 2 * mid);
+        let area = 0; // Area of curve excluding edge trapeziums
+        for (let i = 1; i < coords.length - 1; ++i) area += coords[i][1];
+        let A = 0.5 * h * ((coords[0][1] + coords[coords.length - 1][1]) + 2 * area);
+        // Populate <areaPath>
+        let points = coords.map(([x, y]) => this.getCoordinates(x, y));
+        const ORIGIN = this.getCoordinates(0, 0);
+        obj.path = [
+          ORIGIN,
+          [points[0][0], ORIGIN[1]],
+          ...points,
+          [points[points.length - 1][0], ORIGIN[1]],
+          [points[0][0], ORIGIN[1]]
+        ];
         return A;
-      } else {
-        return NaN;
+      } else if (line.type === 'y') { // Generate coordinates
+        const h = (b - a) / n, coords = [];
+        for (let y = a; y <= b; y += h) { // Generate coordinates
+          let x = line.fn(y);
+          if (Graph.validCoordinates(x, y)) coords.push([x, y]);
+        }
+        let area = 0; // Area of curve excluding edge trapeziums
+        // Trapezium rule
+        for (let i = 1; i < coords.length - 1; ++i) area += coords[i][0];
+        let A = 0.5 * h * ((coords[0][0] + coords[coords.length - 1][0]) + 2 * area);
+        // Populate <areaPath>
+        let points = coords.map(([x, y]) => this.getCoordinates(x, y));
+        const ORIGIN = this.getCoordinates(0, 0);
+        obj.path = [
+          ORIGIN,
+          [ORIGIN[0], points[0][1]],
+          ...points,
+          [ORIGIN[0], points[points.length - 1][1]],
+          [ORIGIN[0], points[0][1]]
+        ];
+        return A;
+      } else if (line.type === 'θ') {
+        const α = (b - a) / n, coords = []; // Angle
+        for (let θ = a; θ <= b; θ += α) {
+          let r = line.fn(θ);
+          if (!isNaN(r) && isFinite(r)) {
+            let x = r * Math.cos(θ), y = r * Math.sin(θ);
+            coords.push([x, y]);
+          }
+        }
+        let A = 0;
+        // Find area using triangles: 0.5*a*b*sin(C), a = sqrt(x0^2+y0^2), b = sqrt(xn^2+yn^2), C = α
+        for (let i = 0; i < coords.length - 1; i++) A += 0.5 * Math.hypot(...coords[i]) * Math.hypot(...coords[i + 1]) * Math.sin(α);
+        let points = coords.map(([x, y]) => this.getCoordinates(x, y));
+        const ORIGIN = this.getCoordinates(0, 0);
+        obj.path = [
+          ORIGIN,
+          ...points,
+          ORIGIN
+        ];
+        return A;
+      } else if (line.type === 'p') {
+        const h = (b - a) / n, coords = [];
+        for (let p = a; p <= b; p += h) {
+          let x = line.fnx(p), y = line.fny(p);
+          if (Graph.validCoordinates(x, y)) coords.push([x, y]);
+        }
+        let A = 0;
+        // Trapeziums A = 0.5*(a+b)*h; heights fy(p), fy(p+h); width fx(p+h)-fx(p)
+        for (let i = 0; i < coords.length - 1; ++i) A += 0.5 * (coords[i][1] + coords[i + 1][1]) * (coords[i + 1][0] - coords[i][0]);
+        let points = coords.map(([x, y]) => this.getCoordinates(x, y));
+        const ORIGIN = this.getCoordinates(0, 0);
+        obj.path = [
+          [points[0][0], ORIGIN[1]],
+          ...points,
+          [points[points.length - 1][0], ORIGIN[1]],
+          [points[0][0], ORIGIN[1]]
+        ];
+        return A;
       }
     }
+    // Use coordinate array
+    let coords = line.coords,
+      secStart = gutils.getCorrepondingCoordinateIndex(a, 'x', coords, false),
+      secEnd = gutils.getCorrepondingCoordinateIndex(b, 'x', coords, false);
+    coords = secStart <= secEnd ? coords.slice(secStart, secEnd + 1) : coords.slice(secEnd, secStart + 1);
+    let area = 0; // Area of curve exuding edge trapeziums
+    for (let i = 1; i < coords.length - 1; ++i) area += coords[i][1];
+    let A = 0.5 * ((b - a) / coords.length) * ((coords[0][1] + coords[coords.length - 1][1]) + 2 * area);
+    // Populate <areaPath>
+    let points = coords.map(([x, y]) => this.getCoordinates(x, y));
+    const ORIGIN = this.getCoordinates(0, 0);
+    obj.path = [
+      ORIGIN,
+      [points[0][0], ORIGIN[1]],
+      ...points,
+      [points[points.length - 1][0], ORIGIN[1]],
+      [points[0][0], ORIGIN[1]]
+    ];
+    return A;
   }
 
   /** Get intercepts between two lines (or coordinate arrays) */
   getIntercepts(id1, id2, DP = undefined) {
     const coords1 = Array.isArray(id1) ? id1 : this._lines.get(id1).coords;
     const coords2 = Array.isArray(id2) ? id2 : this._lines.get(id2).coords;
-    return getIntercepts(coords1, coords2, DP);
+    return gutils.getIntercepts(coords1, coords2, DP);
   }
 
   /** Get corresponding coordinates on a line */
   getCorrepondingCoordinates(coord, axis, lineID, DP = undefined) {
     const coords = Array.isArray(lineID) ? lineID : this._lines.get(lineID).coords;
-    return getCorrespondingCoordinate(coord, axis, coords, true, DP, true);
+    return gutils.getCorrespondingCoordinate(coord, axis, coords, true, DP, true);
   }
 
   /** Get asymptotes for a line. Return { x, y } */
@@ -725,8 +810,8 @@ export class Graph {
     const line = this._lines.get(id);
     if (line) {
       return {
-        x: getAsymptotes(line.coords, this.getYAxisSpan() / 1.4, 'x'),
-        y: getAsymptotes(line.coords, this.getXAxisSpan() / 1.4, 'y'),
+        x: gutils.getAsymptotes(line.coords, this.getYAxisSpan() / 1.4, 'x'),
+        y: gutils.getAsymptotes(line.coords, this.getXAxisSpan() / 1.4, 'y'),
       };
     } else {
       return undefined;
@@ -736,7 +821,7 @@ export class Graph {
   /** Return taylor-approximation of curve with given id. Returns line object, but does not create it. */
   taylorApprox(id, n, around = 0) {
     const coords = this._lines.get(id).coords;
-    const coeffs = taylorApprox(coords, n, around);
+    const coeffs = gutils.taylorApprox(coords, n, around);
     const eq = coeffs.map((c, i) => c === 0 ? '' : c + (i === 0 ? '' : '*' + (around === 0 ? 'x' : `(x${around < 0 ? '' : '-'}${around})`) + '**' + i)).filter(x => x.length !== 0).join('+');
     return {
       type: 'x',
@@ -747,12 +832,12 @@ export class Graph {
 
   /** Get maximum points of a function */
   getMaxPoints(id) {
-    return getMaxPoints(this._lines.get(id).coords);
+    return gutils.getMaxPoints(this._lines.get(id).coords);
   }
 
   /** Get minimum points of a function */
   getMinPoints(id) {
-    return getMinPoints(this._lines.get(id).coords);
+    return gutils.getMinPoints(this._lines.get(id).coords);
   }
 
   /** Populate this._events */

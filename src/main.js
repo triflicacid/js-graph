@@ -1,7 +1,8 @@
 import { Graph } from "./Graph.js";
 import { Point } from "./Point.js";
 import Popup from "./Popup.js";
-import { HEX_ALPHA, extractCoords, round, clamp, createButton, getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getAudioFromCoords, log, random, factorial } from "./utils.js";
+import { HEX_ALPHA, extractCoords, round, clamp, createButton, log, random, factorial, plotPath } from "./utils.js";
+import { getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getAudioFromCoords } from "./graph-utils.js";
 
 const LINE_TYPES = {
   'a': 'addition',
@@ -199,8 +200,7 @@ function main() {
     setFunction(graphData, 'ndist', ['x', 'μ=0', 'σ=1'], '(1/(σ * sqrt(2 * pi))) * e ** (-0.5 * ((x - μ) / σ) ** 2)', true);
 
     // === USER CODE ===
-    // let id = addLine(createLine("x", "x**3 - 3*x", undefined, { color: "#FF00F9" }), graphData);
-    let id = addLine(createLine("x", "x**2", undefined, { color: "#AA00AA", shade: "gt" }), graphData);
+    let id = addLine(createLine("x", "(x**3)*exp(-x)", undefined, { color: "#AA00AA" }), graphData);
     populateLineAnalysisDiv(analysisOptionsDiv, graphData, id, itemListContainer);
     // =================
 
@@ -228,6 +228,7 @@ function setupGraph(parent) {
         dpAccuracy: 5, // How many decimal points should measurements etc... adhere to?
         showCoords: true, // Show mouse coordinates next to cursor?
         displayDp: 2, // How may DP should coordinates be round to when displayed?
+        integrateLimitsN: 10000,
     };
     returnObj.settings = settings;
 
@@ -267,6 +268,22 @@ function setupGraph(parent) {
             });
             this.data = graph.ctx.getImageData(0, 0, graph.width, graph.height); // Cache data
         },
+    };
+    renderParams.caches.shadeArea = {
+      data: undefined,
+      update: true,
+      create() {
+        lines.forEach((data, lineID) => {
+          if (data.shadeArea) {
+            const ldata = graph.getLine(lineID);
+            graph.ctx.beginPath();
+            graph.ctx.fillStyle = (ldata.color ?? "#000000") + "35";
+            plotPath(graph.ctx, data.shadeArea);
+            graph.ctx.fill();
+          }
+        });
+        this.data = graph.ctx.getImageData(0, 0, graph.width, graph.height); // Cache data
+      }
     };
     renderParams.caches.points = { // Caches points of interest (Point[])
         data: undefined,
@@ -401,6 +418,18 @@ function setupGraph(parent) {
                 renderParams.coords = extractCoords(e); // Get coordinates of mouse relative to the canvas
                 renderParams.graphCoords = graph.fromCoordinates(...renderParams.coords); // Get graph coordinates
 
+                let shadeAreaUpdate = false;
+                lines.forEach((data, id) => {
+                  if (data.shadeArea) {
+                    shadeAreaUpdate = true;
+                    delete data.shadeArea;
+                  }
+                });
+                if (shadeAreaUpdate) {
+                  renderParams.caches.shadeArea.update = true;
+                  renderParams.update = true;
+                }
+
                 if (settings.showCoords) renderParams.update = true; // Issue update to update mouse coords
                 if (renderParams.dragging) { // The canvas is being dragged...
                     // Translate canvas
@@ -444,6 +473,20 @@ function setupGraph(parent) {
                 e.preventDefault(); // Prevent page from scrolling
                 graph.opts.ystepGap *= k;
                 graph.opts.xstepGap *= k;
+                if (graph.opts.xstepGap < graph.width / 14) {
+                  graph.opts.xstepGap *= 2;
+                  graph.opts.xstep *= 2;
+                } else if (graph.opts.xstepGap > graph.width / 7) {
+                  graph.opts.xstepGap /= 2;
+                  graph.opts.xstep /= 2;
+                }
+                if (graph.opts.ystepGap < graph.height / 14) {
+                  graph.opts.ystepGap *= 2;
+                  graph.opts.ystep *= 2;
+                } else if (graph.opts.ystepGap > graph.height / 7) {
+                  graph.opts.ystepGap /= 2;
+                  graph.opts.ystep /= 2;
+                }
                 renderParams.caches.line.update = true;
                 renderParams.update = true;
             }
@@ -1023,6 +1066,7 @@ function generateConfigPopup(graphData, onUpdateItemList, onChange) {
     { field: '&Nscr;-Coords', col: 3, title: 'Number of coordinat points to plot for each line function (directly impacts performance)', type: 'number', get: () => graphData.graph.opts.ncoords, set: v => graphData.graph.opts.ncoords = +v },
     { field: 'Approx. Acc.', col: 3, title: 'Accuracy (decimal places) of approximations i.e. finding roots', type: 'number', get: () => graphData.settings.dpAccuracy, set: v => graphData.settings.dpAccuracy = v },
     { field: 'Display Acc.', col: 3, title: 'Accuracy (decimal places) to round coordinates to when displayed', type: 'number', get: () => graphData.settings.displayDp, set: v => graphData.settings.displayDp = v },
+    { field: '&int; Acc.', col: 3, title: 'Number of trapeziums/triangles... used when approximating integral between limits', type: 'number', get: () => graphData.settings.integrateLimitsN, set: v => graphData.settings.integrateLimitsN = +v },
 
     { field: 'Loop', col: 4, title: 'Loop sound audio', type: 'boolean', get: () => graphData.settings.soundLoop, set: v => graphData.settings.soundLoop = v },
     { field: 'Mult', col: 4, title: 'Multiply sound data by this constant', type: 'number', get: () => graphData.settings.soundMultiplier, set: v => graphData.settings.soundMultiplier = v },
@@ -1812,10 +1856,16 @@ function populateLineAnalysisDiv(parent, graphData, lineID, itemListContainer) {
     if (bounds) {
       let [a, b] = bounds.split(',').map(n => eval(n));
       if (b < a) return alert(`Invalid bound relationship`);
-      let area = graphData.graph.getArea(lineData.coords, a, b);
+      let obj = { path: undefined };
+      let area = graphData.graph.getArea(lineID, a, b, graphData.settings.integrateLimitsN, obj);
       if (area === undefined) alert(`Area ${a}-${b} is undefined`);
       else if (isNaN(area)) alert(`Unable to calculate area ${a}-${b}`);
-      else alert(area);
+      else { 
+        alert(area);
+        graphData.lines.get(lineID).shadeArea = obj.path;
+        graphData.renderParams.caches.shadeArea.update = true;
+        graphData.renderParams.update = true;
+      }
     }
   }));
   // Approximate

@@ -1,3 +1,4 @@
 - Assymptotes
 - Option to combine line shaded regions and only shade the combined region
-- Integration between limits - while popup is showing, shade area between limits (change popup to Popup class)
+- Integration between limits - info popup
+- Add more info to README
