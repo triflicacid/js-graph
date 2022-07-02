@@ -1,6 +1,7 @@
 import { Point } from "./Point.js";
 import { lerpCoords, plotPath, roundMultiple, roundTowards0, roundTowardsInf } from "./utils.js";
 import * as gutils from "./graph-utils.js";
+import { Complex } from "./libs/Complex.js";
 
 export class Graph {
   constructor(canvas, eventListenerEl) {
@@ -544,6 +545,30 @@ export class Graph {
             }
             break;
           }
+          case 'z': {
+            inc = xAxisSpan / ncoords;
+            let o;
+            if (data.cond) {
+              for (var i = 0, x = opts.xstart; i < ncoords; ++i, x += inc) {
+                if (!data.cond(x)) continue;
+                data.fn.setSymbol('z', new Complex(x));
+                o = data.fn.evaluate();
+                if (o.error) break;
+                let z = o.value;
+                if (Graph.validCoordinates(z.a, z.b)) coords.push([z.a, z.b]);
+              }
+            } else {
+              for (var i = 0, x = opts.xstart; i < ncoords; ++i, x += inc) {
+                data.fn.setSymbol('z', new Complex(x));
+                o = data.fn.evaluate();
+                if (o.error) break;
+                let z = o.value;
+                if (Graph.validCoordinates(z.a, z.b)) coords.push([z.a, z.b]);
+              }
+            }
+            if (o.error) data.emsg = o.msg;
+            break;
+          }
           default:
             data.emsg = `Unknown plot type '${data.type}'`;
         }
@@ -615,7 +640,7 @@ export class Graph {
         } else if (Math.abs(y - coords[i + 1][1]) >= asyh) {
           stroke = true;
           inPath = false;
-        } else if (Math.abs(coords[i + 1][0] - x) > this.opts.xstep) {
+        } else if (Math.abs(coords[i + 1][0] - x) > (data.drawAll ? this.width * .33 : this.opts.xstep)) {
           stroke = true;
           inPath = false;
         }

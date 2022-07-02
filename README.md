@@ -60,6 +60,7 @@ Each line is an object which contains sketching and aesthetic data.
 - `color: string` [*optional*] [`default='black'`] contains a CSS color string and specifies the color of the line.
 - `coord: 'x' | 'y'` [*optional*] [`default='y'`] If type is `a` or `s`, specifies which coordinate to add/subtract.
 - `dash: number[]` [*optional*] [`default=[]`] specifies the line dash pattern. `[]` sets to a solid line.
+- `drawAll: boolean` [`default=false`] connect every co-ordinate?
 - `id: number` [*optional*] required for some line types. Specifies IDs of lines.
 - `ids: number[]` [*optional*] required for some line types. Specifies list of line IDs.
 - `join: boolean` [*optional*] [`default=true`] specifies whether to join plotted coordinates or not.
@@ -68,10 +69,11 @@ Each line is an object which contains sketching and aesthetic data.
 - `lineWidth: string` [*optional*] specifies width of line/radii of dots. If not present, `opts.lineWidth` is used.
 - `ncoords: number` [*optional*] specifies the number of coordinates to calculate before sketching. If not present, the graph's `opts.ncoords` is used instead. The larger `ncoords`, the smoother the line.
 - `degree: number` [*optional*] Required if `type == ~`. Specifies polynomial degree of approximation.
-- `fn: Function` : the sketching function of the line. The input and output depends on `type` (see `type` for more).
+- `fn: Function|Expression` : the sketching function/expression of the line. The input and output depends on `type` (see `type` for more).
   - `x`: signature `(x: number) => number`. Coordinates: `[x, fn(x)]`.
   - `y`: signature `(y: number) => number`. Coordinates: `[fn(y), y]`.
   - `p`: signature uses `fnx` and `fny` seperatly. Coordinates: `[fnx(p), fny(p)]`.
+  - `z`: contains `Expression` object
 `fnx: (p: number) => number` : function used for sketching type `p`. Takes parameter `p` and returns `x` coordinate.
 `fny: (p: number) => number` : function used for sketching type `p`. Takes parameter `p` and returns `y` coordinate.
 - `range: any[] | 'x' | 'y' | 'a'` [*optional*] specifies the **inclusive** range for certain types `p` and `θ` syntax `[min, max, <step>]`.
@@ -95,6 +97,7 @@ Each line is an object which contains sketching and aesthetic data.
   - `s` : subtraction. The key `ids` contains an array of line IDs to subtract from one another.
   - `m` : multiplication. The key `ids` contains an array of line IDs to multiply togetherr.
   - `t` : translate. Translate coordinates of line `id` by scaling X, shifting X, scale Y, shifting Y, rotate (property `C` is an array)
+  - `z` : complex. The x-coordinate is passed into `data.fn`, which returns `Complex` z = a + bi and plots `[a, b]`
   - `θ` : polar. `θ` varies in `range` and `f(θ)` returns `r`, which is plotted as the polar coordinate `[r, θ]`.
   - `~` : approximation. Use Taylor approximation to approximate curve `id`.
 

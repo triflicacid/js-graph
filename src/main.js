@@ -3,6 +3,9 @@ import { Point } from "./Point.js";
 import Popup from "./Popup.js";
 import { HEX_ALPHA, extractCoords, round, clamp, createButton, log, random, factorial, plotPath } from "./utils.js";
 import { getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getAudioFromCoords } from "./graph-utils.js";
+import { Expression, OPERATORS_IMAG } from "./libs/Expression.js";
+import { Complex } from "./libs/Complex.js";
+import { lambertw_scalar } from "./libs/lambertw.js";
 
 const LINE_TYPES = {
   'a': 'addition',
@@ -16,6 +19,7 @@ const LINE_TYPES = {
   't': 'translate',
   'x': 'x-coordinates',
   'y': 'y-coordinates',
+  'z': 'complex',
   'θ': 'polar',
   '~': 'approximation'
 };
@@ -31,6 +35,7 @@ const LINE_DESCRIPTIONS = {
   't': `Translate line by scale, shift and rotation`,
   'x': 'x-coordinates are controlled and passed to function which returns y-coordinate',
   'y': 'y-coordinates are controlled and passed to function which returns x-coordinate',
+  'z': 'real x-coordinates a passed in, plots returned complex number {z = a + bi} as [a, b]',
   'θ': 'Polar: θ is an angle in radians with the polar point [fn(θ), θ] being plotted.',
   '~': 'Approximate function around a point using the Taylor series',
 };
@@ -194,15 +199,30 @@ function main() {
   setRawFunction(graphData, 'clamp', clamp);
   setRawFunction(graphData, 'rand', random);
   setRawFunction(graphData, 'factorial', factorial);
+  setRawFunction(graphData, 'lambertw', lambertw_scalar);
   setFunction(graphData, 'frac', ['x'], 'x - floor(x)', true);
   setFunction(graphData, 'sawtooth', ['x', 'T', 'A=1', 'P=0'], 'A * frac(x / T + P)', true);
   setFunction(graphData, 'sinc', ['x'], 'x == 0 ? 1 : sin(pi*x)/(pi*x)', true);
   setFunction(graphData, 'ndist', ['x', 'μ=0', 'σ=1'], '(1/(σ * sqrt(2 * pi))) * e ** (-0.5 * ((x - μ) / σ) ** 2)', true);
 
+
   // === USER CODE ===
   // let id = addLine(createLine("x", "(x**3)*exp(-x)", undefined, { color: "#AA00AA" }), graphData);
-  let id = addLine(createLine("θ", "pi", undefined, { color: "#AA0055" }), graphData);
-  populateLineAnalysisDiv(analysisOptionsDiv, graphData, id, itemListContainer);
+  // let id = addLine(createLine("θ", "pi", undefined, { color: "#AA0055" }), graphData);
+  // let id = addLine(createLine('z', "(3.23606797749979 ** z - (0 - 1.2360679774997898) ** z) / (2 ** z * 2.23606797749979)"), graphData);
+  let id = addLine(createLine('z', 'z'), graphData);
+  // const k = 0;
+  // let id = addLine({
+  //   type: 'x',
+  //   fn: x => lambertw_scalar(new Complex(x), k, 1e-8).a,
+  //   color: '#ff0000',
+  // }, graphData);
+  // addLine({
+  //   type: 'x',
+  //   fn: x => lambertw_scalar(new Complex(x), k, 1e-8).b,
+  //   color: '#0000ff',
+  // }, graphData);
+  // populateLineAnalysisDiv(analysisOptionsDiv, graphData, id, itemListContainer);
   // =================
 
   populateItemList(itemListContainer, graphData, analysisOptionsDiv);
@@ -615,6 +635,13 @@ function createLine(type = undefined, value = undefined, arg = undefined, proper
     }
   } else if (type === 'c') {
     data.coords = value;
+    data.drawAll = true;
+  } else if (type === 'z') {
+    let expr = createNewExpression(value);
+    expr.parse(OPERATORS_IMAG);
+    data.fnRaw = value;
+    data.fn = expr;
+    data.drawAll = true;
   } else {
     let fnRaw = value ?? prompt(`Enter function of line\nf(${type}) = ...`);
     if (!fnRaw) return;
@@ -623,6 +650,16 @@ function createLine(type = undefined, value = undefined, arg = undefined, proper
   }
   for (let prop in properties) data[prop] = properties[prop];
   return data;
+}
+
+/** Create and return Expression object for type 'z' */
+function createNewExpression(expr = undefined) {
+  let E = new Expression(expr);
+  E.numberOpts.imag = "i";
+  E.setSymbol(E.numberOpts.imag, Complex.I);
+  E.setSymbol("pi", Math.PI);
+  E.setSymbol("e", Math.E);
+  return E;
 }
 
 /** Remove line from graph. */
@@ -1124,6 +1161,24 @@ function generateLineCardOverview(lineID, lineData, graphData, onChange) {
       }));
       break;
     }
+    case 'z': {
+      span.innerHTML += `&#402;(&${lineData.type}scr;) = `;
+      let input = document.createElement('input');
+      input.type = "text";
+      input.value = lineData.fnRaw;
+      input.addEventListener("change", () => {
+        lineData.fn.load(input.value);
+        let o = lineData.fn.parse(OPERATORS_IMAG);
+        if (o.error) {
+          alert(`Error defining function:\n${o.msg}`);
+        } else {
+          lineData.fnRaw = input.value;
+          onChange();
+        }
+      });
+      span.appendChild(input);
+      break;
+    }
     case '~': {
       span.innerHTML += `Approx. around &xscr; = `;
       let input = document.createElement("input");
@@ -1453,6 +1508,37 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
       el.innerHTML = `&Iscr;&fscr; `;
       let inputCond = generateLineConditionInput(lineData.type === 'x' ? '𝓍' : '𝓎', lineData, () => { });
       el.appendChild(inputCond);
+      break;
+    }
+    case 'z': {
+      // Define function if not defined
+      if (!lineData.fnRaw) {
+        lineData.fnRaw = lineData.type;
+        lineData.fn = createNewExpression(lineData.fnRaw).parse(OPERATORS_IMAG);
+      }
+
+      let el = document.createElement("p");
+      div.appendChild(el);
+      el.innerHTML = `&#402;(&${lineData.type}scr;) = `;
+      let inputEquation = document.createElement('input');
+      inputEquation.type = "text";
+      inputEquation.value = lineData.fnRaw;
+      inputEquation.addEventListener("change", () => {
+        lineData.fn.load(inputEquation.value);
+        let o = lineData.fn.parse(OPERATORS_IMAG);
+        if (o.error) {
+          alert(`Error defining function:\n${o.msg}`);
+        } else {
+          lineData.fnRaw = inputEquation.value;
+        }
+      });
+      el.appendChild(inputEquation);
+
+      // el = document.createElement("p");
+      // div.appendChild(el);
+      // el.innerHTML = `&Iscr;&fscr; `;
+      // let inputCond = generateLineConditionInput(lineData.type === 'x' ? '𝓍' : '𝓎', lineData, () => { });
+      // el.appendChild(inputCond);
       break;
     }
     case '~': {
@@ -1922,7 +2008,7 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
     }
     default:
       div.innerHTML = `<em><strong>Unknown line type ${lineData.type}</strong></em>`;
-      return;
+      return div;
   }
 
   let el = document.createElement("span");
