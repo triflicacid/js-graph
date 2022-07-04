@@ -231,21 +231,14 @@ export class Complex {
       b = za.b;
     }
     else if (za.equals(0) && zb.b === 0 && zb.a > 0) { // 0^n where n > 0 if 0 else NaN
-      if (zb.b === 0 && zb.a > 0) {
-        a = 0;
-        b = 0;
-      }
-      else {
-        a = NaN;
-        b = NaN;
-      }
+      a = b = zb.b === 0 && zb.a > 0 ? 0 : NaN;
     }
     else {
       const r = za.getMag(), θ = za.getArg();
-      let common = Math.pow(r, zb.a) * Math.exp(-zb.b * θ); // Commong multiplier of both
+      let k = Math.pow(r, zb.a) * Math.exp(-zb.b * θ); // Commong multiplier of both
       let value = (zb.a * θ) + (zb.b * Math.log(r)); // Commong value of trig functions
-      a = common * Math.cos(value);
-      b = common * Math.sin(value);
+      a = k * Math.cos(value);
+      b = k * Math.sin(value);
     }
     return new Complex(a, b);
   }
@@ -294,8 +287,7 @@ export class Complex {
     let k = new Complex(0, -1); // -i
     return Complex.mult(k, ln); // <k> * <ln>
   }
-  /** Calculate hyperbolic arccosine of a number
-  */
+  /** Calculate hyperbolic arccosine of a number */
   static arccosh(z_) {
     // arccosh(z) = ln[z + |z^2 - 1|^0.5 * e^((i/2) * arg(z^2 - 1))]
     const z = Complex.parse(z_);
@@ -351,15 +343,29 @@ export class Complex {
   static abs(z_) {
     return Complex.parse(z_).getMag();
   }
-  /** square root */
+  /** square root (principle branch) */
   static sqrt(z_) {
     const z = Complex.parse(z_);
     return Complex.pow(z, 0.5);
   }
-  /** cube root */
+  /** cube root (principle branch) */
   static cbrt(z_) {
     const z = Complex.parse(z_);
     return Complex.pow(z, 1 / 3);
+  }
+  /**
+   * Return the nth roots of a complex number z
+   *
+   * suppose `z^n = k*exp(i*a)`, then `z = k^(1/n)*exp(i*((a + 2*m*pi)/n))` for `m=0,1,...,n`
+   *
+   * @returns array of roots of size `n`
+   */
+  static root(z_, n) {
+    const z = Complex.parse(z_);
+    const arg = z.getArg();
+    const args = Array.from({ length: n }, (_, m) => (arg + 2 * m * Math.PI) / n); // Argument values of roots
+    const k = Math.pow(z.getMag(), 1 / n);
+    return args.map(arg => Complex.fromPolar(k, arg));
   }
   /** Return ceiling of a number */
   static ceil(z_) {
@@ -384,15 +390,71 @@ export class Complex {
     const ea = Math.exp(z.a); // e ^ a
     return new Complex(ea * Math.cos(z.b), ea * Math.sin(z.b));
   }
+  /** Compare: is a == b? */
+  static eq(a, b) {
+    return a.a === b.a && a.b === b.b;
+  }
+  /**
+   * Compare: is a > b?
+   * - If Im(a) = Im(b) = 0, return Re(a) > Re(b)
+   * - If Re(a) = Re(b) = 0, return Im(a) > Im(b)
+   * - Else, return false
+  */
+  static gt(a, b) {
+    if (a.b === 0 && b.b === 0)
+      return a.a > b.a;
+    if (a.a === 0 && b.a === 0)
+      return a.b > b.b;
+    return false;
+  }
+  /**
+   * Compare: is a >= b?
+   * - If Im(a) = Im(b) = 0, return Re(a) >= Re(b)
+   * - If Re(a) = Re(b) = 0, return Im(a) >= Im(b)
+   * - Else, return false
+  */
+  static ge(a, b) {
+    if (a.b === 0 && b.b === 0)
+      return a.a >= b.a;
+    if (a.a === 0 && b.a === 0)
+      return a.b >= b.b;
+    return false;
+  }
+  /**
+   * Compare: is a < b?
+   * - If Im(a) = Im(b) = 0, return Re(a) < Re(b)
+   * - If Re(a) = Re(b) = 0, return Im(a) < Im(b)
+   * - Else, return false
+  */
+  static lt(a, b) {
+    if (a.b === 0 && b.b === 0)
+      return a.a < b.a;
+    if (a.a === 0 && b.a === 0)
+      return a.b < b.b;
+    return false;
+  }
+  /**
+   * Compare: is a <= b?
+   * - If Im(a) = Im(b) = 0, return Re(a) <= Re(b)
+   * - If Re(a) = Re(b) = 0, return Im(a) <= Im(b)
+   * - Else, return false
+  */
+  static le(a, b) {
+    if (a.b === 0 && b.b === 0)
+      return a.a <= b.a;
+    if (a.a === 0 && b.a === 0)
+      return a.b <= b.b;
+    return false;
+  }
   /** Generate complex number from polar representation */
   static fromPolar(r, θ) {
     return new Complex(r * Math.cos(θ), r * Math.sin(θ));
   }
-  /** Return complex unit */
+  /** Return new complex unit */
   static get I() { return new Complex(0, 1); }
-  /** Return not-a-number */
+  /** Return new not-a-number */
   static get NaN() { return new Complex(NaN, NaN); }
-  /** Return infinity */
+  /** Return new infinity */
   static get Inf() { return new Complex(Infinity, Infinity); }
   /** Attemot to parse argument to a complex number */
   static parse(z) {
@@ -429,9 +491,9 @@ export class Complex {
     }
   }
 }
-// Apply a function to a complex number
-export function _zapply(arg, fn) {
-  const z = Complex.parse(arg);
+/** Apply a function to a complex number */
+export function _zapply(z_, fn) {
+  const z = Complex.parse(z_);
   z.a = fn(z.a);
   z.b = fn(z.b);
   return z;

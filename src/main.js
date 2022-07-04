@@ -36,7 +36,7 @@ const LINE_DESCRIPTIONS = {
   'x': 'x-coordinates are controlled and passed to function which returns y-coordinate',
   'y': 'y-coordinates are controlled and passed to function which returns x-coordinate',
   'z': 'real x-coordinates a passed in, plots returned complex number {z = a + bi} as [a, b]',
-  'θ': 'Polar: θ is an angle in radians with the polar point [fn(θ), θ] being plotted.',
+  'θ': 'Polar: a is an angle in radians with the polar point [fn(a), a] being plotted.',
   '~': 'Approximate function around a point using the Taylor series',
 };
 const PARAMETRIC_VARIABLE = 'p';
@@ -102,7 +102,7 @@ function main() {
   const btnAddNewLine = document.createElement('button');
   btnAddNewLine.innerText = "+ Add Line";
   btnAddNewLine.addEventListener('click', () => {
-    const popup = generateLinePopup(graphData.graph, lineData => {
+    const popup = generateLinePopup(graphData, lineData => {
       popup.hide();
       addLine(lineData, graphData); // Add line to graph
       populateItemList(itemListContainer, graphData, analysisOptionsDiv);
@@ -117,7 +117,7 @@ function main() {
     let sym = prompt(`Enter constant symbol`);
     if (!sym) return;
     if (!CONSTANT_SYM_REGEX.test(sym)) return alert(`Invalid symbol name - must match ${CONSTANT_SYM_REGEX}`);
-    if (graphData.constants.has(sym)) return alert(`Constant with symbol '${sym}' already exists`);
+    if (graphData.baseExpr.hasSymbol(sym)) return alert(`Symbol '${sym}' is already in use`);
     setConstant(graphData, sym, 1);
     populateItemList(itemListContainer, graphData, analysisOptionsDiv); // Update item list
     graphData.renderParams.caches.line.update = true;
@@ -172,45 +172,48 @@ function main() {
   window.graphData = graphData;
 
   // Common functions
-  setRawFunction(graphData, 'pow', Math.pow);
-  setRawFunction(graphData, 'abs', Math.abs);
-  setRawFunction(graphData, 'round', round);
-  setRawFunction(graphData, 'floor', Math.floor);
-  setRawFunction(graphData, 'ceil', Math.ceil);
-  setRawFunction(graphData, 'sgn', Math.sign);
-  setRawFunction(graphData, 'sqrt', Math.sqrt);
-  setRawFunction(graphData, 'exp', Math.exp);
-  setRawFunction(graphData, 'sin', Math.sin);
-  setRawFunction(graphData, 'arcsin', Math.asin);
-  setRawFunction(graphData, 'sinh', Math.sinh);
-  setRawFunction(graphData, 'arcsinh', Math.asinh);
-  setRawFunction(graphData, 'csc', n => 1 / Math.sin(n));
-  setRawFunction(graphData, 'cos', Math.cos);
-  setRawFunction(graphData, 'arccos', Math.acos);
-  setRawFunction(graphData, 'cosh', Math.cosh);
-  setRawFunction(graphData, 'arccosh', Math.acosh);
-  setRawFunction(graphData, 'sec', n => 1 / Math.cos(n));
-  setRawFunction(graphData, 'tan', Math.tan);
-  setRawFunction(graphData, 'arctan', Math.atan);
-  setRawFunction(graphData, 'tanh', Math.tanh);
-  setRawFunction(graphData, 'arctanh', Math.atanh);
-  setRawFunction(graphData, 'cot', n => 1 / Math.tan(n));
-  setRawFunction(graphData, 'log', log);
-  setRawFunction(graphData, 'clamp', clamp);
-  setRawFunction(graphData, 'rand', random);
-  setRawFunction(graphData, 'factorial', factorial);
-  setRawFunction(graphData, 'lambertw', lambertw_scalar);
+  graphData.baseExpr.numberOpts.imag = "i";
+  graphData.baseExpr.setSymbol("pi", Math.PI);
+  graphData.baseExpr.setSymbol("e", Math.E);
+  graphData.baseExpr.setSymbol(graphData.baseExpr.numberOpts.imag, Complex.I);
+  graphData.baseExpr.setSymbol('pow', Math.pow);
+  graphData.baseExpr.setSymbol('abs', Math.abs);
+  graphData.baseExpr.setSymbol('round', round);
+  graphData.baseExpr.setSymbol('floor', Math.floor);
+  graphData.baseExpr.setSymbol('ceil', Math.ceil);
+  graphData.baseExpr.setSymbol('sgn', Math.sign);
+  graphData.baseExpr.setSymbol('sqrt', Math.sqrt);
+  graphData.baseExpr.setSymbol('exp', Math.exp);
+  graphData.baseExpr.setSymbol('sin', Math.sin);
+  graphData.baseExpr.setSymbol('arcsin', Math.asin);
+  graphData.baseExpr.setSymbol('sinh', Math.sinh);
+  graphData.baseExpr.setSymbol('arcsinh', Math.asinh);
+  graphData.baseExpr.setSymbol('csc', n => 1 / Math.sin(n));
+  graphData.baseExpr.setSymbol('cos', Math.cos);
+  graphData.baseExpr.setSymbol('arccos', Math.acos);
+  graphData.baseExpr.setSymbol('cosh', Math.cosh);
+  graphData.baseExpr.setSymbol('arccosh', Math.acosh);
+  graphData.baseExpr.setSymbol('sec', n => 1 / Math.cos(n));
+  graphData.baseExpr.setSymbol('tan', Math.tan);
+  graphData.baseExpr.setSymbol('arctan', Math.atan);
+  graphData.baseExpr.setSymbol('tanh', Math.tanh);
+  graphData.baseExpr.setSymbol('arctanh', Math.atanh);
+  graphData.baseExpr.setSymbol('cot', n => 1 / Math.tan(n));
+  graphData.baseExpr.setSymbol('log', log);
+  graphData.baseExpr.setSymbol('clamp', clamp);
+  graphData.baseExpr.setSymbol('rand', random);
+  graphData.baseExpr.setSymbol('factorial', factorial);
+  graphData.baseExpr.setSymbol('lambertw', (x) => lambertw_scalar(new Complex(x), 0, 1e-8));
+  graphData.baseExpr.setSymbol('Re', z => z.a);
+  graphData.baseExpr.setSymbol('Im', z => z.b);
+
   setFunction(graphData, 'frac', ['x'], 'x - floor(x)', true);
-  setFunction(graphData, 'sawtooth', ['x', 'T', 'A=1', 'P=0'], 'A * frac(x / T + P)', true);
-  setFunction(graphData, 'sinc', ['x'], 'x == 0 ? 1 : sin(pi*x)/(pi*x)', true);
-  setFunction(graphData, 'ndist', ['x', 'μ=0', 'σ=1'], '(1/(σ * sqrt(2 * pi))) * e ** (-0.5 * ((x - μ) / σ) ** 2)', true);
+  setFunction(graphData, 'sawtooth', ['x', 'T', 'A', 'P'], 'A * frac(x / T + P)', true);
+  setFunction(graphData, 'sinc', ['x'], 'sin(pi*x)/(pi*x)', true);
+  setFunction(graphData, 'ndist', ['x', 'm', 's'], '(1/(s * sqrt(2 * pi))) * e ** (-0.5 * ((x - m) / s) ** 2)', true);
 
 
-  // === USER CODE ===
-  // let id = addLine(createLine("x", "(x**3)*exp(-x)", undefined, { color: "#AA00AA" }), graphData);
-  // let id = addLine(createLine("θ", "pi", undefined, { color: "#AA0055" }), graphData);
-  // let id = addLine(createLine('z', "(3.23606797749979 ** z - (0 - 1.2360679774997898) ** z) / (2 ** z * 2.23606797749979)"), graphData);
-  let id = addLine(createLine('z', 'z'), graphData);
+  // #region USER CODE
   // const k = 0;
   // let id = addLine({
   //   type: 'x',
@@ -223,14 +226,41 @@ function main() {
   //   color: '#0000ff',
   // }, graphData);
   // populateLineAnalysisDiv(analysisOptionsDiv, graphData, id, itemListContainer);
-  // =================
+  addLine({
+    type: "x",
+    expr: (function () {
+      let E = createNewExpression(graphData, "x*e**x");
+      E.parse(graphData.exprOpts);
+      return E;
+    })(),
+    color: '#2B8E28'
+  }, graphData);
+  addLine({
+    type: "x",
+    expr: (function () {
+      let E = createNewExpression(graphData, "Re(lambertw(x))");
+      E.parse(graphData.exprOpts);
+      return E;
+    })(),
+    color: '#ff0000'
+  }, graphData);
+  addLine({
+    type: "x",
+    expr: (function () {
+      let E = createNewExpression(graphData, "Im(lambertw(x))");
+      E.parse(graphData.exprOpts);
+      return E;
+    })(),
+    color: '#0000ff'
+  }, graphData);
+  // #endregion
 
   populateItemList(itemListContainer, graphData, analysisOptionsDiv);
 }
 
 /** Sets up graph and attached it to a given parent element */
 function setupGraph(parent, itemListContainer, analysisOptionsDiv) {
-  const returnObj = { parent };
+  const returnObj = { parent, baseExpr: new Expression(), exprOps: undefined };
 
   const canvas = document.createElement('canvas');
   parent.appendChild(canvas);
@@ -570,95 +600,12 @@ function addLine(lineData, graphData) {
   return id;
 }
 
-/** Create and return line data object from minimal arguments */
-function createLine(type = undefined, value = undefined, arg = undefined, properties = {}) {
-  type = type ?? prompt('Line type', 'x');
-  if (type == null) return false;
-  const data = { type };
-  if (type === 'd' || type === 'i') {
-    let id = value ?? prompt(`Enter ID of line`);
-    if (id === null) return;
-    data.id = +id;
-  } else if (type === 'sc' || type === 'sh') {
-    let id = value ?? prompt(`Enter ID of line`);
-    if (id === null) return;
-    data.id = +id;
-    if (arg) {
-      data.C = arg;
-    } else {
-      arg = prompt(`Enter constant`, '1');
-      if (arg === null) arg = 1;
-      else arg = eval(arg);
-      data.C = arg;
-    }
-  } else if (type === 'e') {
-    data.lhsRaw = value[0];
-    data.lhs = Function('x', 'y', 'return ' + data.lhsRaw);
-    data.rhsRaw = value[1];
-    data.rhs = Function('x', 'y', 'return ' + data.rhsRaw);
-  } else if (type === 'a' || type === 's' || type === 'm') {
-    if (value) {
-      data.ids = value;
-    } else {
-      let ids = value ?? prompt(`Enter comma-seperated list of line IDs`);
-      if (ids === null) return;
-      ids = ids.split(',').map(id => +id);
-      data.ids = ids;
-    }
-  } else if (type === 't') {
-    data.id = value ?? parseInt(prompt(`Enter line ID`));
-    if (arg) {
-      data.C = arg;
-    } else {
-      let str = prompt(`Enter values: scale_x, shift_x, scale_y, shift_y, rotation [radians]`, '1, 0, 1, 0, Math.PI');
-      str = str.split(',').map(n => +eval(n));
-      data.C = str;
-    }
-  } else if (type === 'p') {
-    if (!value) {
-      value = [
-        prompt(`Enter function for x-coordinate\nf(${type}) = ...`, type) ?? type,
-        prompt(`Enter function for y-coordinate\nf(${type}) = ...`, type) ?? type,
-      ];
-    }
-    data.fnxRaw = value[0];
-    data.fnx = Function(type, 'return ' + data.fnxRaw);
-    data.fnyRaw = value[1];
-    data.fny = Function(type, 'return ' + data.fnyRaw);
-
-    if (!arg) {
-      arg = prompt(`Enter min / max value for parameter p\nFormat: <min>, <max>`, '0, 1');
-      if (arg === 'x' || arg === 'y' || arg === 'a') data.range = arg;
-      else data.range = arg.split(',').map(n => eval(n));
-    } else {
-      data.range = arg;
-    }
-  } else if (type === 'c') {
-    data.coords = value;
-    data.drawAll = true;
-  } else if (type === 'z') {
-    let expr = createNewExpression(value);
-    expr.parse(OPERATORS_IMAG);
-    data.fnRaw = value;
-    data.fn = expr;
-    data.drawAll = true;
-  } else {
-    let fnRaw = value ?? prompt(`Enter function of line\nf(${type}) = ...`);
-    if (!fnRaw) return;
-    data.fnRaw = fnRaw;
-    data.fn = Function(type, 'return ' + fnRaw);
-  }
-  for (let prop in properties) data[prop] = properties[prop];
-  return data;
-}
-
 /** Create and return Expression object for type 'z' */
-function createNewExpression(expr = undefined) {
-  let E = new Expression(expr);
-  E.numberOpts.imag = "i";
-  E.setSymbol(E.numberOpts.imag, Complex.I);
-  E.setSymbol("pi", Math.PI);
-  E.setSymbol("e", Math.E);
+function createNewExpression(graphData, expr = undefined) {
+  let E = graphData.baseExpr.copy(expr);
+  E._symbols = graphData.baseExpr._symbols;
+  // E.numberOpts.imag = "i";
+  // E.setSymbol(E.numberOpts.imag, Complex.I);
   return E;
 }
 
@@ -686,14 +633,14 @@ function setConstant(graphData, name, value) {
   } else {
     graphData.constants.set(name, { value });
   }
-  globalThis[name] = value;
+  graphData.baseExpr.setSymbol(name, value);
 }
 
 /** Remove a constant */
 function removeConstant(graphData, name) {
   if (graphData.constants.has(name)) {
     graphData.constants.delete(name);
-    delete globalThis[name];
+    graphData.baseExpr.delSymbol(name);
   }
 }
 
@@ -704,30 +651,42 @@ function setFunction(graphData, name, args = undefined, source = undefined, visi
     if (args !== undefined) data.args = args;
     if (source !== undefined) data.source = source;
     if (visible !== undefined) data.visible = !!visible;
-    data.fn = Function(args, 'return ' + source);
+    let old = data.expr.getOriginal();
+    data.expr.load(source);
+    let o = data.expr.parse(graphData.exprOpts);
+    if (o.error) {
+      alert(`Error defining function ${name}:\n${o.msg}`);
+      data.expr.load(old);
+      data.expr.parse(graphData.exprOpts);
+      return;
+    }
   } else {
-    graphData.funcs.set(name, { args, source, fn: Function(args, 'return ' + source), visible: !!visible });
+    const data = { args, source, visible: !!visible };
+    data.expr = createNewExpression(graphData, source);
+    let o = data.expr.parse(graphData.exprOpts);
+    if (o.error) {
+      alert(`Error defining function ${name}:\n${o.msg}`);
+      return;
+    }
+    graphData.funcs.set(name, data);
   }
   const data = graphData.funcs.get(name);
-  globalThis[name] = data.fn;
-}
-
-function setRawFunction(graphData, name, fn) {
-  if (graphData.funcs.has(name)) {
-    graphData.funcs.get(name).fn = fn;
-  } else {
-    graphData.funcs.set(name, { fn, visible: false });
-  }
-  const data = graphData.funcs.get(name);
-  globalThis[name] = data.fn;
-
+  graphData.baseExpr.setSymbol(name, (...args) => {
+    let map = new Map(), symbols = data.expr._symbols;
+    graphData.baseExpr._symbols.forEach((v, k) => map.set(k, v));
+    data.expr._symbols = map;
+    for (let i = 0; i < data.args.length; i++) map.set(data.args[i], args[i]);
+    let r = data.expr.evaluate();
+    data.expr._symbols = symbols;
+    return r;
+  });
 }
 
 /** Remove a function */
 function removeFunction(graphData, name) {
   if (graphData.funcs.has(name)) {
     graphData.funcs.delete(name);
-    delete globalThis[name];
+    graphData.baseExpr.delSymbol(name);
   }
 }
 
@@ -1101,8 +1060,22 @@ function generateLineCard(lineID, graphData, analysisOptionsDiv, itemListContain
   btnCopy.title = 'Clone Line';
   btnCopy.classList.add("btn-copy");
   btnCopy.addEventListener("click", () => {
-    /** TODO: DEEP COPY **/
-    addLine({ ...lineData }, graphData); // Copy line data
+    /** TODO: DEEPER COPY **/
+    let newData = {};
+    for (let prop in lineData) {
+      if (lineData.hasOwnProperty(prop)) {
+        if (lineData[prop] instanceof Expression) {
+          let E = new Expression(lineData[prop]._raw);
+          E._symbols = lineData[prop]._symbols;
+          E._tokens = [...lineData[prop]._tokens];
+          E.numberOpts = lineData[prop].numberOpts;
+          newData[prop] = E;
+        } else {
+          newData[prop] = lineData[prop];
+        }
+      }
+    }
+    addLine(newData, graphData); // Copy line data
     reRender(); // Re-render entire list of item cards
   });
   divButtons.appendChild(btnCopy);
@@ -1154,28 +1127,13 @@ function generateLineCardOverview(lineID, lineData, graphData, onChange) {
   switch (lineData.type) {
     case 'x': case 'y': {
       span.innerHTML += `&#402;(&${lineData.type}scr;) = `;
-      span.appendChild(generateLineFunctionInput(lineData.type, lineData.fnRaw, (fn, fnRaw) => {
-        lineData.fnRaw = fnRaw;
-        lineData.fn = fn;
-        onChange();
-      }));
+      let input = generateExpressionInput(lineData.expr, onChange, graphData.exprOpts);
+      span.appendChild(input);
       break;
     }
     case 'z': {
       span.innerHTML += `&#402;(&${lineData.type}scr;) = `;
-      let input = document.createElement('input');
-      input.type = "text";
-      input.value = lineData.fnRaw;
-      input.addEventListener("change", () => {
-        lineData.fn.load(input.value);
-        let o = lineData.fn.parse(OPERATORS_IMAG);
-        if (o.error) {
-          alert(`Error defining function:\n${o.msg}`);
-        } else {
-          lineData.fnRaw = input.value;
-          onChange();
-        }
-      });
+      let input = generateExpressionInput(lineData.expr, onChange, OPERATORS_IMAG);
       span.appendChild(input);
       break;
     }
@@ -1211,31 +1169,19 @@ function generateLineCardOverview(lineID, lineData, graphData, onChange) {
 
       let p = document.createElement("p");
       p.innerHTML = `&#402;<sub>&xscr;</sub>(${PARAMETRIC_VARIABLE}) = `;
-      p.appendChild(generateLineFunctionInput(PARAMETRIC_VARIABLE, lineData.fnxRaw, (fn, fnRaw) => {
-        lineData.fnx = fn;
-        lineData.fnxRaw = fnRaw;
-        onChange();
-      }));
+      p.appendChild(generateExpressionInput(lineData.exprx, onChange, graphData.exprOpts));
       div.appendChild(p);
 
       p = document.createElement("p");
       p.innerHTML = `&#402;<sub>&yscr;</sub>(${PARAMETRIC_VARIABLE}) = `;
-      p.appendChild(generateLineFunctionInput(PARAMETRIC_VARIABLE, lineData.fnyRaw, (fn, fnRaw) => {
-        lineData.fny = fn;
-        lineData.fnyRaw = fnRaw;
-        onChange();
-      }));
+      p.appendChild(generateExpressionInput(lineData.expry, onChange, graphData.exprOpts));
       div.appendChild(p);
 
       break;
     }
     case 'θ': {
-      span.innerHTML += `&#402;(θ) = `;
-      span.appendChild(generateLineFunctionInput("θ", lineData.fnRaw, (fn, fnRaw) => {
-        lineData.fn = fn;
-        lineData.fnRaw = fnRaw;
-        onChange();
-      }));
+      span.innerHTML += `&#402;(a) = `;
+      span.appendChild(generateExpressionInput(lineData.expr, onChange, graphData.exprOpts));
       break;
     }
     default:
@@ -1320,6 +1266,7 @@ function generateConfigPopup(graphData, onUpdateItemList, onChange) {
   pcThead.appendChild(pcTheadRow);
   const cols = [];
   const optsArray = [
+    { field: 'Complex Maths', col: 1, title: 'Allow arithmatic with complex numbers (must still return a real number)', type: 'boolean', get: () => graphData.exprOpts !== undefined, set: v => graphData.exprOpts = (v ? OPERATORS_IMAG : undefined) },
     { field: 'Start X', col: 1, title: 'Left-most X value', type: 'number', get: () => graphData.graph.opts.xstart, set: v => graphData.graph.opts.xstart = +v },
     { field: 'X Step', col: 1, title: 'Width of gap between x-axis markers', type: 'number', get: () => graphData.graph.opts.xstep, set: v => graphData.graph.opts.xstep = +v },
     { field: 'X Step Gap', col: 1, title: 'Gap (in pixels) between each x-axis marker', type: 'number', get: () => graphData.graph.opts.xstepGap, set: v => graphData.graph.opts.xstepGap = +v },
@@ -1400,20 +1347,18 @@ function generateConfigPopup(graphData, onUpdateItemList, onChange) {
   return popup;
 }
 
-/** Create and return <input /> which allows editing of a function. onChange(fn: Function, fnRaw: string) */
-function generateLineFunctionInput(argString, functionString, onChange) {
-  const input = document.createElement('input');
+/** Creates and returns new <input /> which allows the editing of an Expression. NB, Expression is directly modified (if no error) */
+function generateExpressionInput(expr, onChange = undefined, parseOperators = undefined) {
+  const input = document.createElement("input");
   input.type = "text";
-  input.value = functionString;
+  input.value = expr.getOriginal();
   input.addEventListener("change", () => {
-    let fn, fnRaw = input.value;
-    try {
-      fn = Function(argString, 'return ' + fnRaw);
-      functionString = fnRaw;
-      onChange(fn, fnRaw);
-    } catch (e) {
-      alert(`Error defining function: ${e.message}`);
-      input.value = functionString;
+    expr.load(input.value);
+    let o = expr.parse(parseOperators);
+    if (o.error) {
+      alert(`Error defining function:\n${o.msg}`);
+    } else if (onChange) {
+      onChange();
     }
   });
   return input;
@@ -1448,7 +1393,7 @@ function generateLineConditionInput(variable, lineData, onChange) {
 }
 
 /** Show popup for a line. If lineData is undefined, allow creation of any line. */
-function generateLinePopup(graph, callback, lineData = undefined) {
+function generateLinePopup(graphData, callback, lineData = undefined) {
   const popup = new Popup("Create Line"), container = document.createElement("div");
   popup.setContent(container);
   let el = document.createElement("p");
@@ -1466,7 +1411,7 @@ function generateLinePopup(graph, callback, lineData = undefined) {
   /** Populate divContainer */
   function populate(lineData, btnType) {
     divContainer.innerHTML = '';
-    divContainer.appendChild(generateLineConfigDiv(graph, lineData, callback, btnType));
+    divContainer.appendChild(generateLineConfigDiv(graphData, lineData, callback, btnType));
   }
 
   if (lineData) {
@@ -1481,7 +1426,7 @@ function generateLinePopup(graph, callback, lineData = undefined) {
 }
 
 /** Return <div /> containing line configuration information. btnType: 0 => none, 1 => create line, 2 => update line */
-function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
+function generateLineConfigDiv(graphData, lineData, callback, btnType = 0) {
   const div = document.createElement('div');
   div.classList.add("line-config");
   div.innerHTML = `<em>${LINE_DESCRIPTIONS[lineData.type]}</em><br>`;
@@ -1489,49 +1434,35 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
     case 'x':
     case 'y': {
       // Define function if not defined
-      if (!lineData.fnRaw) {
-        lineData.fnRaw = lineData.type;
-        lineData.fn = Function(lineData.type, 'return ' + lineData.type);
+      if (!lineData.expr) {
+        lineData.expr = createNewExpression(graphData, lineData.type);
+        lineData.expr.parse(graphData.exprOpts);
       }
 
       let el = document.createElement("p");
       div.appendChild(el);
       el.innerHTML = `&#402;(&${lineData.type}scr;) = `;
-      let inputEquation = generateLineFunctionInput(lineData.type, lineData.fnRaw, (fn, fnRaw) => {
-        lineData.fnRaw = fnRaw;
-        lineData.fn = fn;
-      });
-      el.appendChild(inputEquation);
+      let input = generateExpressionInput(lineData.expr, undefined, graphData.exprOpts);
+      el.appendChild(input);
 
       el = document.createElement("p");
       div.appendChild(el);
       el.innerHTML = `&Iscr;&fscr; `;
-      let inputCond = generateLineConditionInput(lineData.type === 'x' ? '𝓍' : '𝓎', lineData, () => { });
+      let inputCond = generateLineConditionInput(graphData, lineData.type === 'x' ? '𝓍' : '𝓎', lineData, () => { });
       el.appendChild(inputCond);
       break;
     }
     case 'z': {
       // Define function if not defined
-      if (!lineData.fnRaw) {
-        lineData.fnRaw = lineData.type;
-        lineData.fn = createNewExpression(lineData.fnRaw).parse(OPERATORS_IMAG);
+      if (!lineData.expr) {
+        lineData.expr = createNewExpression(graphData, lineData.type);
+        lineData.expr.parse(OPERATORS_IMAG);
       }
 
       let el = document.createElement("p");
       div.appendChild(el);
       el.innerHTML = `&#402;(&${lineData.type}scr;) = `;
-      let inputEquation = document.createElement('input');
-      inputEquation.type = "text";
-      inputEquation.value = lineData.fnRaw;
-      inputEquation.addEventListener("change", () => {
-        lineData.fn.load(inputEquation.value);
-        let o = lineData.fn.parse(OPERATORS_IMAG);
-        if (o.error) {
-          alert(`Error defining function:\n${o.msg}`);
-        } else {
-          lineData.fnRaw = inputEquation.value;
-        }
-      });
+      let inputEquation = generateExpressionInput(lineData.expr, undefined, OPERATORS_IMAG)
       el.appendChild(inputEquation);
 
       // el = document.createElement("p");
@@ -1542,13 +1473,30 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
       break;
     }
     case '~': {
+      if (!lineData.expr) {
+        lineData.expr = createNewExpression(graphData, "0");
+        lineData.expr.parse(graphData.exprOpts);
+      }
       div.insertAdjacentHTML("beforeend", "<p>&#402;(&xscr;) &#8776; &#402;(&ascr;) + &#402;'(&ascr;)(&xscr;-&ascr;) + (&#402;''(&ascr;)/2!)(&xscr;-&ascr;)<sup>2</sup> + ... + (&#402;<sup>(&nscr;)</sup>(&ascr;)/&nscr;!)(&xscr;-&ascr;)<sup>&nscr;</sup></p>");
-      div.insertAdjacentHTML("beforeend", `<p>Current Approx: <input type='text' value="${lineData.fnRaw ?? ''}" /></p>`);
       let el = document.createElement("p");
+      el.innerText = "Current Approx: ";
+      let approxInput = document.createElement("input");
+      approxInput.type = "text";
+      approxInput.value = lineData.expr.getOriginal();
+      approxInput.addEventListener("change", () => {
+        lineData.expr.load(approxInput.value);
+        let o = lineData.expr.parse(graphData.exprOpts);
+        if (o.error) {
+          alert(`Error in expression:\n${o.msg}`);
+        }
+      })
+      div.appendChild(el);
+      el.appendChild(approxInput);
+      el = document.createElement("p");
       el.innerHTML = `ID of line to approximate: `;
       let selectID = document.createElement("select");
       selectID.insertAdjacentHTML("beforeend", "<option selected disabled>ID</option>");
-      graph.getLines().forEach(id => selectID.insertAdjacentHTML('beforeend', `<option ${id}>${id}</option>`));
+      graphData.graph.getLines().forEach(id => selectID.insertAdjacentHTML('beforeend', `<option ${id}>${id}</option>`));
       if (lineData.id === undefined) lineData.id = NaN; else selectID.value = lineData.id;
       selectID.addEventListener("change", () => lineData.id = +selectID.value);
       el.appendChild(selectID);
@@ -1583,66 +1531,33 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
       break;
     }
     case 'e': {
-      let el = document.createElement("p");
-      div.appendChild(el);
-      let inputLHS = document.createElement("input");
-      if (!lineData.lhsRaw) {
-        lineData.lhsRaw = 'x';
-        lineData.lhs = Function('x', 'y', 'return ' + lineData.lhsRaw);
+      if (!lineData.lhs) {
+        lineData.lhs = createNewExpression(graphData, "x");
+        lineData.lhs.parse(graphData.exprOpts);
       }
-      inputLHS.type = "text";
-      inputLHS.value = lineData.lhsRaw;
-      inputLHS.addEventListener('change', () => {
-        let fn, fnRaw = inputLHS.value;
-        try {
-          fn = Function('x', 'y', 'return ' + fnRaw);
-        } catch (e) {
-          alert(`Error defining function: ${e.message}`);
-          inputLHS.value = lineData.lhsRaw;
-          return;
-        }
-        lineData.lhsRaw = fnRaw;
-        lineData.lhs = fn;
-      });
-      el.appendChild(inputLHS);
-      el.insertAdjacentHTML("beforeend", " = ");
-      let inputRHS = document.createElement("input");
-      if (!lineData.lhsRaw) {
-        lineData.rhsRaw = 'x';
-        lineData.rhs = Function('x', 'y', 'return ' + lineData.rhsRaw);
-      }
-      inputRHS.type = "text";
-      inputRHS.value = lineData.rhsRaw;
-      inputRHS.addEventListener('change', () => {
-        let fn, fnRaw = inputRHS.value;
-        try {
-          fn = Function('x', 'y', 'return ' + fnRaw);
-        } catch (e) {
-          alert(`Error defining function: ${e.message}`);
-          inputRHS.value = lineData.rhsRaw;
-          return;
-        }
-        lineData.rhsRaw = fnRaw;
-        lineData.rhs = fn;
-      });
-      el.appendChild(inputRHS);
-      break;
-    }
-    case 'θ': {
-      lineData.range ??= [0, 2 * Math.PI];
-      if (!lineData.fnRaw) {
-        lineData.fnRaw = lineData.type;
-        lineData.fn = Function(lineData.type, 'return ' + lineData.type);
+      if (!lineData.rhs) {
+        lineData.rhs = createNewExpression(graphData, "y");
+        lineData.rhs.parse(graphData.exprOpts);
       }
 
       let el = document.createElement("p");
       div.appendChild(el);
-      el.innerHTML = `&#402;(θ) = `;
-      let inputEquation = generateLineFunctionInput("θ", lineData.fnRaw, (fn, fnRaw) => {
-        lineData.fn = fn;
-        lineData.fnRaw = fnRaw;
-      });
-      el.appendChild(inputEquation);
+      el.appendChild(generateExpressionInput(lineData.lhs, undefined, graphData.exprOpts));
+      el.insertAdjacentHTML("beforeend", " = ");
+      el.appendChild(generateExpressionInput(lineData.rhs, undefined, graphData.exprOpts));
+      break;
+    }
+    case 'θ': {
+      lineData.range ??= [0, 2 * Math.PI];
+      if (!lineData.expr) {
+        lineData.expr = createNewExpression(graphData, lineData.type);
+        lineData.expr.parse();
+      }
+
+      let el = document.createElement("p");
+      div.appendChild(el);
+      el.innerHTML = `&#402;(a) = `;
+      el.appendChild(generateExpressionInput(lineData.expr, undefined, graphData.exprOpts));
 
       el = document.createElement("p");
       let inputRangeMin = document.createElement("input");
@@ -1650,7 +1565,7 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
       inputRangeMin.value = lineData.range[0];
       inputRangeMin.addEventListener("change", () => updateRange());
       el.appendChild(inputRangeMin);
-      el.insertAdjacentHTML("beforeend", ` &leq; θ &leq; `);
+      el.insertAdjacentHTML("beforeend", ` &leq; a &leq; `);
       let inputRangeMax = document.createElement("input");
       inputRangeMax.type = 'text';
       inputRangeMax.value = lineData.range[1];
@@ -1659,10 +1574,10 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
       div.appendChild(el);
 
       el = document.createElement("p");
-      el.innerHTML = '<strong>θ Step</strong>: ';
+      el.innerHTML = '<strong>a Step</strong>: ';
       let inputStep = document.createElement("input");
       inputStep.type = 'text';
-      inputStep.title = 'Step of θ. Leave blank for default.';
+      inputStep.title = 'Step of a. Leave blank for default.';
       inputStep.placeholder = 'Default';
       if (lineData.range[2] !== undefined) inputStep.value = lineData.range[2];
       inputStep.addEventListener("change", () => {
@@ -1702,31 +1617,23 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
     }
     case 'p': {
       lineData.range ??= [-2, 2];
-      if (!lineData.fnxRaw) {
-        lineData.fnxRaw = PARAMETRIC_VARIABLE;
-        lineData.fnx = Function(PARAMETRIC_VARIABLE, 'return ' + lineData.fnxRaw);
+      if (!lineData.exprx) {
+        lineData.exprx = createNewExpression(graphData, PARAMETRIC_VARIABLE);
+        lineData.exprx.parse(graphData.exprOpts);
       }
-      if (!lineData.fnyRaw) {
-        lineData.fnyRaw = PARAMETRIC_VARIABLE;
-        lineData.fny = Function(PARAMETRIC_VARIABLE, 'return ' + lineData.fnyRaw);
+      if (!lineData.expry) {
+        lineData.expry = createNewExpression(graphData, PARAMETRIC_VARIABLE);
+        lineData.expry.parse(graphData.exprOpts);
       }
 
       let el = document.createElement("p");
       el.innerHTML = `&#402;<sub>&xscr;</sub>(${PARAMETRIC_VARIABLE}) = `;
-      let inputEquationX = generateLineFunctionInput(PARAMETRIC_VARIABLE, lineData.fnxRaw, (fn, fnRaw) => {
-        lineData.fnx = fn;
-        lineData.fnxRaw = fnRaw;
-      });
-      el.appendChild(inputEquationX);
+      el.appendChild(generateExpressionInput(lineData.exprx, undefined, graphData.exprOpts));
       div.appendChild(el);
 
       el = document.createElement("p");
       el.innerHTML = `&#402;<sub>&yscr;</sub>(${PARAMETRIC_VARIABLE}) = `;
-      let inputEquationY = generateLineFunctionInput(PARAMETRIC_VARIABLE, lineData.fnyRaw, (fn, fnRaw) => {
-        lineData.fny = fn;
-        lineData.fnyRaw = fnRaw;
-      });
-      el.appendChild(inputEquationY);
+      el.appendChild(generateExpressionInput(lineData.expry, undefined, graphData.exprOpts));
       div.appendChild(el);
 
       el = document.createElement("p");
@@ -1790,7 +1697,7 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
       el.innerHTML = `ID of line to ${method}: `;
       let selectID = document.createElement("select");
       selectID.insertAdjacentHTML("beforeend", "<option selected disabled>ID</option>");
-      graph.getLines().forEach(id => selectID.insertAdjacentHTML('beforeend', `<option ${id}>${id}</option>`));
+      graphData.graph.getLines().forEach(id => selectID.insertAdjacentHTML('beforeend', `<option ${id}>${id}</option>`));
       if (lineData.id === undefined) lineData.id = NaN; else selectID.value = lineData.id;
       selectID.addEventListener("change", () => lineData.id = +selectID.value);
       el.appendChild(selectID);
@@ -1853,7 +1760,7 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
       el.innerHTML = `ID of line to translate: `;
       let selectID = document.createElement("select");
       selectID.insertAdjacentHTML("beforeend", "<option selected disabled>ID</option>");
-      graph.getLines().forEach(id => selectID.insertAdjacentHTML('beforeend', `<option ${id}>${id}</option>`));
+      graphData.graph.getLines().forEach(id => selectID.insertAdjacentHTML('beforeend', `<option ${id}>${id}</option>`));
       lineData.id ??= NaN;
       if (!isNaN(lineData.id)) selectID.value = lineData.id;
       selectID.addEventListener("change", () => lineData.id = +selectID.value);
@@ -1866,7 +1773,7 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
       transInputX.type = 'number';
       transInputX.value = lineData.C[1];
       transInputX.title = 'X Coordinate';
-      transInputX.step = graph.opts.xstep;
+      transInputX.step = graphData.graph.opts.xstep;
       transInputX.classList.add('small');
       transInputX.addEventListener('change', e => {
         lineData.C[1] = +e.target.value;
@@ -1878,7 +1785,7 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
       transInputY.classList.add('small');
       transInputY.value = lineData.C[3];
       transInputY.title = 'Y Coordinate';
-      transInputY.step = graph.opts.ystep;
+      transInputY.step = graphData.graph.opts.ystep;
       transInputY.addEventListener('change', e => {
         lineData.C[3] = +e.target.value;
       });
@@ -2024,7 +1931,7 @@ function generateLineConfigDiv(graph, lineData, callback, btnType = 0) {
   el.innerHTML = '<strong>Line Width</strong>: ';
   let inputLineWidth = document.createElement("input");
   inputLineWidth.type = "number";
-  inputLineWidth.value = lineData.lineWidth ?? graph.opts.lineWidth;
+  inputLineWidth.value = lineData.lineWidth ?? graphData.graph.opts.lineWidth;
   inputLineWidth.addEventListener("change", () => lineData.lineWidth = +inputLineWidth.value);
   el.appendChild(inputLineWidth);
   div.appendChild(el);
@@ -2307,7 +2214,7 @@ function generateFunctionPopup(graphData, onChange) {
     td = document.createElement("td");
     let inpBody = document.createElement("input");
     inpBody.value = info.source.trim();
-    inpBody.title = 'Function body (JS code)';
+    inpBody.title = 'Function body';
     inpBody.addEventListener('change', () => {
       info.source = inpBody.value.trim();
       inpBody.value = info.source;
@@ -2340,8 +2247,9 @@ function generateFunctionPopup(graphData, onChange) {
     let name = prompt('Enter function name');
     if (name) {
       if (!CONSTANT_SYM_REGEX.test(name)) return alert(`Invalid function name - must match ${CONSTANT_SYM_REGEX}`);
-      if (graphData.funcs.has(name)) return alert(`Function called ${name} already exists`);
+      if (graphData.baseExpr.hasSymbol(name)) return alert(`Symbol ${name} already in use`);
       setFunction(graphData, name, ['x'], 'x', true);
+      console.log(graphData)
       tbody.appendChild(createRow(name));
       onChange();
     }

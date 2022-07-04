@@ -60,7 +60,15 @@ Each line is an object which contains sketching and aesthetic data.
 - `color: string` [*optional*] [`default='black'`] contains a CSS color string and specifies the color of the line.
 - `coord: 'x' | 'y'` [*optional*] [`default='y'`] If type is `a` or `s`, specifies which coordinate to add/subtract.
 - `dash: number[]` [*optional*] [`default=[]`] specifies the line dash pattern. `[]` sets to a solid line.
+- `degree: number` [*optional*] Required if `type == ~`. Specifies polynomial degree of approximation.
 - `drawAll: boolean` [`default=false`] connect every co-ordinate?
+- `expr: Expression` : the sketching expression of the line. The input and output depends on `type` (see `type` for more).
+  - `x`: given variable `x`, return value `y`. Coordinates: `[x, y]`.
+  - `y`: given variable `y`, return value `x`. Coordinates: `[x, y]`.
+  - `p`: `exprx` and `expry` are called, returning `x` and `y` respectively. Coordinates: `[x, y]`.
+  - `z`: contains `Expression` object
+- `exprx: Expression` : Used in skecthing type `p`. Takes parameter `p` and returns `x` coordinate.
+- `expry: Expression` : Used in skecthing type `p`. Takes parameter `p` and returns `y` coordinate.
 - `id: number` [*optional*] required for some line types. Specifies IDs of lines.
 - `ids: number[]` [*optional*] required for some line types. Specifies list of line IDs.
 - `join: boolean` [*optional*] [`default=true`] specifies whether to join plotted coordinates or not.
@@ -68,19 +76,13 @@ Each line is an object which contains sketching and aesthetic data.
   - `false`: draw circle of radius `lineWidth` at each coordinate.
 - `lineWidth: string` [*optional*] specifies width of line/radii of dots. If not present, `opts.lineWidth` is used.
 - `ncoords: number` [*optional*] specifies the number of coordinates to calculate before sketching. If not present, the graph's `opts.ncoords` is used instead. The larger `ncoords`, the smoother the line.
-- `degree: number` [*optional*] Required if `type == ~`. Specifies polynomial degree of approximation.
-- `fn: Function|Expression` : the sketching function/expression of the line. The input and output depends on `type` (see `type` for more).
-  - `x`: signature `(x: number) => number`. Coordinates: `[x, fn(x)]`.
-  - `y`: signature `(y: number) => number`. Coordinates: `[fn(y), y]`.
-  - `p`: signature uses `fnx` and `fny` seperatly. Coordinates: `[fnx(p), fny(p)]`.
-  - `z`: contains `Expression` object
-`fnx: (p: number) => number` : function used for sketching type `p`. Takes parameter `p` and returns `x` coordinate.
-`fny: (p: number) => number` : function used for sketching type `p`. Takes parameter `p` and returns `y` coordinate.
+- `lhs: Expression` used in `type=e`. A numeric expression which returns a value, given `x` and `y` values of current co-ordinate.
 - `range: any[] | 'x' | 'y' | 'a'` [*optional*] specifies the **inclusive** range for certain types `p` and `θ` syntax `[min, max, <step>]`.
   - `any[]` : 2/3-element array `[min, max, <step>]`
   - `x` : the x-axis boundaries are `min` and `max` respectively.
   - `y` : the y-axis boundaries are `min` and `max` respectively.
   - `a` : angle; span from `0` to `2pi`.
+- `rhs: Expression` used in `type=e`. A numeric expression which returns a value, given `x` and `y` values of current co-ordinate.
 - `shade: string` [*optional*] [`default=""`] Shade area of curve. Ignored if `join=false`.
   - ``   : default - just sketch the line
   - `gt` : shade below the curve. Dashed line.
@@ -88,17 +90,19 @@ Each line is an object which contains sketching and aesthetic data.
   - `ge` : shade below the curve. Solid line.
   - `le` : shade below the curve. Solid line.
 - `type: string` [*optional*] [`default='x'`] specifies the type of the line
+  - `a` : addition. The key `ids` contains an array of line IDs to add together.
+  - `c` : co-ordinates. Provide array `coords` which is an array of `[x,y]` co-ordinates to plot.
+  - `d` : derivative. Sketch the change in gradient of line with ID `id` (must be specified and sketched already).
+  - `e` : equation. Plot co-ordinate where `lhs` = `rhs`.
+  - `i` : integrand. Sketch a curve as if `id` is the change in gradient of that function (reverse `m`). The constant `C` is specifide.
+  - `m` : multiplication. The key `ids` contains an array of line IDs to multiply togetherr.
+  - `p` : parametric. The paremeter `p` is controlled by `range` and outputs a 2-element array `[x, y]`. Coordinates: `data.fn(p)`.
+  - `s` : subtraction. The key `ids` contains an array of line IDs to subtract from one another.
+  - `t` : translate. Translate coordinates of line `id` by scaling X, shifting X, scale Y, shifting Y, rotate (property `C` is an array)
   - `x` : the x-coordinates are passed into `data.fn` and the output is `y`. Coordinates: `[x, data.fn(x)]`.
   - `y` : the y-coordinates are passed into `data.fn` and the output is `x`. Coordinates: `[data.fn(y), y]`.
-  - `p` : parametric. The paremeter `p` is controlled by `range` and outputs a 2-element array `[x, y]`. Coordinates: `data.fn(p)`.
-  - `d` : derivative. Sketch the change in gradient of line with ID `id` (must be specified and sketched already).
-  - `i` : integrand. Sketch a curve as if `id` is the change in gradient of that function (reverse `m`). The constant `C` is specifide.
-  - `a` : addition. The key `ids` contains an array of line IDs to add together.
-  - `s` : subtraction. The key `ids` contains an array of line IDs to subtract from one another.
-  - `m` : multiplication. The key `ids` contains an array of line IDs to multiply togetherr.
-  - `t` : translate. Translate coordinates of line `id` by scaling X, shifting X, scale Y, shifting Y, rotate (property `C` is an array)
   - `z` : complex. The x-coordinate is passed into `data.fn`, which returns `Complex` z = a + bi and plots `[a, b]`
-  - `θ` : polar. `θ` varies in `range` and `f(θ)` returns `r`, which is plotted as the polar coordinate `[r, θ]`.
+  - `θ` : polar. `a` varies in `range` and `f(a)` returns `r`, which is plotted as the polar coordinate `[r, a]`.
   - `~` : approximation. Use Taylor approximation to approximate curve `id`.
 
 *The following properties are generated by `.sketch()`*

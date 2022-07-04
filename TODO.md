@@ -1,3 +1,4 @@
 - Assymptotes
 - Option to combine line shaded regions and only shade the combined region
-- Add more info to README
+- Add more functions
+- In complex mode, switch to using complex functions
