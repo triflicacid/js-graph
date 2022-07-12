@@ -252,6 +252,15 @@ export function getMinPoints(coords) {
   return points;
 }
 
+/** Return area under co-ordinates */
+export function getArea(coords) {
+  const a = coords[0][0], b = coords[coords.length - 1][0]; // Bounds
+  let area = 0; // Area of curve exuding edge trapeziums
+  for (let i = 1; i < coords.length - 1; ++i) area += coords[i][1];
+  let A = 0.5 * ((b - a) / coords.length) * ((coords[0][1] + coords[coords.length - 1][1]) + 2 * area);
+  return A;
+}
+
 /** Create AudioContext from array of coords. Return { AudioContext, AudioBufferSourceNode } */
 export function getAudioFromCoords(coords, durationMult = 1, mult = 1) {
   const audioContext = new AudioContext();

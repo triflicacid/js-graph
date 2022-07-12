@@ -3,7 +3,7 @@ import { Point } from "./Point.js";
 import Popup from "./Popup.js";
 import { HEX_ALPHA, extractCoords, round, clamp, createButton, log, random, factorial, plotPath } from "./utils.js";
 import { getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getAudioFromCoords } from "./graph-utils.js";
-import { Expression, OPERATORS_IMAG } from "./libs/Expression.js";
+import { Expression, OPERATORS_DEFAULT, OPERATORS_IMAG } from "./libs/Expression.js";
 import { Complex } from "./libs/Complex.js";
 import { lambertw_scalar } from "./libs/lambertw.js";
 
@@ -35,7 +35,7 @@ const LINE_DESCRIPTIONS = {
   't': `Translate line by scale, shift and rotation`,
   'x': 'x-coordinates are controlled and passed to function which returns y-coordinate',
   'y': 'y-coordinates are controlled and passed to function which returns x-coordinate',
-  'z': 'real x-coordinates a passed in, plots returned complex number {z = a + bi} as [a, b]',
+  'z': 'x-coordinates are controlled and passed to a function which return a complex number z=a+bi. Seperatly plot [x, Re(z)] and [x, Im(z)]',
   'θ': 'Polar: a is an angle in radians with the polar point [fn(a), a] being plotted.',
   '~': 'Approximate function around a point using the Taylor series',
 };
@@ -173,86 +173,56 @@ function main() {
 
   // Common functions
   graphData.baseExpr.numberOpts.imag = "i";
-  graphData.baseExpr.setSymbol("pi", Math.PI);
-  graphData.baseExpr.setSymbol("e", Math.E);
-  graphData.baseExpr.setSymbol(graphData.baseExpr.numberOpts.imag, Complex.I);
-  graphData.baseExpr.setSymbol('pow', Math.pow);
-  graphData.baseExpr.setSymbol('abs', Math.abs);
-  graphData.baseExpr.setSymbol('round', round);
-  graphData.baseExpr.setSymbol('floor', Math.floor);
-  graphData.baseExpr.setSymbol('ceil', Math.ceil);
-  graphData.baseExpr.setSymbol('sgn', Math.sign);
-  graphData.baseExpr.setSymbol('sqrt', Math.sqrt);
-  graphData.baseExpr.setSymbol('exp', Math.exp);
-  graphData.baseExpr.setSymbol('sin', Math.sin);
-  graphData.baseExpr.setSymbol('arcsin', Math.asin);
-  graphData.baseExpr.setSymbol('sinh', Math.sinh);
-  graphData.baseExpr.setSymbol('arcsinh', Math.asinh);
-  graphData.baseExpr.setSymbol('csc', n => 1 / Math.sin(n));
-  graphData.baseExpr.setSymbol('cos', Math.cos);
-  graphData.baseExpr.setSymbol('arccos', Math.acos);
-  graphData.baseExpr.setSymbol('cosh', Math.cosh);
-  graphData.baseExpr.setSymbol('arccosh', Math.acosh);
-  graphData.baseExpr.setSymbol('sec', n => 1 / Math.cos(n));
-  graphData.baseExpr.setSymbol('tan', Math.tan);
-  graphData.baseExpr.setSymbol('arctan', Math.atan);
-  graphData.baseExpr.setSymbol('tanh', Math.tanh);
-  graphData.baseExpr.setSymbol('arctanh', Math.atanh);
-  graphData.baseExpr.setSymbol('cot', n => 1 / Math.tan(n));
-  graphData.baseExpr.setSymbol('log', log);
-  graphData.baseExpr.setSymbol('clamp', clamp);
-  graphData.baseExpr.setSymbol('rand', random);
-  graphData.baseExpr.setSymbol('factorial', factorial);
-  graphData.baseExpr.setSymbol('lambertw', (x) => lambertw_scalar(new Complex(x), 0, 1e-8));
-  graphData.baseExpr.setSymbol('Re', z => z.a);
-  graphData.baseExpr.setSymbol('Im', z => z.b);
+  graphData.baseExpr.constSymbols.set("pi", Math.PI);
+  graphData.baseExpr.constSymbols.set("e", Math.E);
+  graphData.baseExpr.constSymbols.set(graphData.baseExpr.numberOpts.imag, Complex.I);
+  graphData.baseExpr.constSymbols.set('pow', (a, b) => graphData.isImag ? Complex.pow(a, b) : Math.pow(a, b));
+  graphData.baseExpr.constSymbols.set('abs', a => graphData.isImag ? Complex.abs(a) : Math.abs(a));
+  graphData.baseExpr.constSymbols.set('round', a => graphData.isImag ? Complex.round(a) : round(a));
+  graphData.baseExpr.constSymbols.set('floor', a => graphData.isImag ? Complex.floor(a) : Math.floor(a));
+  graphData.baseExpr.constSymbols.set('ceil', a => graphData.isImag ? Complex.ceil(a) : Math.ceil(a));
+  graphData.baseExpr.constSymbols.set('sgn', a => graphData.isImag ? Complex.sign(a) : Math.sign(a));
+  graphData.baseExpr.constSymbols.set('sqrt', a => graphData.isImag ? Complex.sqrt(a) : Math.sqrt(a));
+  graphData.baseExpr.constSymbols.set('exp', a => graphData.isImag ? Complex.exp(a) : Math.exp(a));
+  graphData.baseExpr.constSymbols.set('sin', a => graphData.isImag ? Complex.sin(a) : Math.sin(a));
+  graphData.baseExpr.constSymbols.set('arcsin', a => graphData.isImag ? Complex.arcsin(a) : Math.asin(a));
+  graphData.baseExpr.constSymbols.set('sinh', a => graphData.isImag ? Complex.sinh(a) : Math.sinh(a));
+  graphData.baseExpr.constSymbols.set('arcsinh', a => graphData.isImag ? Complex.arcsinh(a) : Math.asinh(a));
+  graphData.baseExpr.constSymbols.set('csc', n => graphData.isImag ? Complex.div(1, Complex.sin(n)) : 1 / Math.sin(n));
+  graphData.baseExpr.constSymbols.set('cos', a => graphData.isImag ? Complex.cos(a) : Math.cos(a));
+  graphData.baseExpr.constSymbols.set('arccos', a => graphData.isImag ? Complex.arccos(a) : Math.acos(a));
+  graphData.baseExpr.constSymbols.set('cosh', a => graphData.isImag ? Complex.cosh(a) : Math.cosh(a));
+  graphData.baseExpr.constSymbols.set('arccosh', a => graphData.isImag ? Complex.arccosh(a) : Math.acosh(a));
+  graphData.baseExpr.constSymbols.set('sec', n => graphData.isImag ? Complex.div(1, Complex.cos(n)) : 1 / Math.cos(n));
+  graphData.baseExpr.constSymbols.set('tan', a => graphData.isImag ? Complex.tan(a) : Math.tan(a));
+  graphData.baseExpr.constSymbols.set('arctan', a => graphData.isImag ? Complex.arctan(a) : Math.atan(a));
+  graphData.baseExpr.constSymbols.set('tanh', a => graphData.isImag ? Complex.tanh(a) : Math.tanh(a));
+  graphData.baseExpr.constSymbols.set('arctanh', a => graphData.isImag ? Complex.arctanh(a) : Math.atanh(a));
+  graphData.baseExpr.constSymbols.set('cot', n => graphData.isImag ? Complex.div(1, Complex.tan(n)) : 1 / Math.tan(n));
+  graphData.baseExpr.constSymbols.set('log', a => graphData.isImag ? Complex.log(a) : Math.log(a));
+  // graphData.baseExpr.constSymbols.set('clamp', clamp);
+  graphData.baseExpr.constSymbols.set('rand', (a, b) => graphData.isImag ? new Complex(random(a.a, b.a)) : random(a, b));
+  graphData.baseExpr.constSymbols.set('factorial', a => graphData.isImag ? new Complex(factorial(a.a)) : factorial(a));
+  graphData.baseExpr.constSymbols.set('lambertw', (x) => lambertw_scalar(new Complex(x), 0, 1e-8));
+  graphData.baseExpr.constSymbols.set('Re', z => z.a);
+  graphData.baseExpr.constSymbols.set('Im', z => z.b);
 
-  setFunction(graphData, 'frac', ['x'], 'x - floor(x)', true);
-  setFunction(graphData, 'sawtooth', ['x', 'T', 'A', 'P'], 'A * frac(x / T + P)', true);
-  setFunction(graphData, 'sinc', ['x'], 'sin(pi*x)/(pi*x)', true);
-  setFunction(graphData, 'ndist', ['x', 'm', 's'], '(1/(s * sqrt(2 * pi))) * e ** (-0.5 * ((x - m) / s) ** 2)', true);
+  graphData.isImag = true;
+  graphData.baseExpr.operators = OPERATORS_IMAG;
 
+  createFunction(graphData, 'frac', ['x'], 'x - floor(x)');
+  createFunction(graphData, 'sawtooth', ['x', 'T', 'A', 'P'], 'A * frac(x / T + P)', true);
+  createFunction(graphData, 'sinc', ['x'], 'sin(pi*x)/(pi*x)');
+  createFunction(graphData, 'ndist', ['x', 'm', 's'], '(1/(s * sqrt(2 * pi))) * e ** (-0.5 * ((x - m) / s) ** 2)', true);
 
   // #region USER CODE
-  // const k = 0;
-  // let id = addLine({
-  //   type: 'x',
-  //   fn: x => lambertw_scalar(new Complex(x), k, 1e-8).a,
-  //   color: '#ff0000',
-  // }, graphData);
-  // addLine({
-  //   type: 'x',
-  //   fn: x => lambertw_scalar(new Complex(x), k, 1e-8).b,
-  //   color: '#0000ff',
-  // }, graphData);
-  // populateLineAnalysisDiv(analysisOptionsDiv, graphData, id, itemListContainer);
   addLine({
-    type: "x",
-    expr: (function () {
-      let E = createNewExpression(graphData, "x*e**x");
-      E.parse(graphData.exprOpts);
-      return E;
-    })(),
-    color: '#2B8E28'
-  }, graphData);
-  addLine({
-    type: "x",
-    expr: (function () {
-      let E = createNewExpression(graphData, "Re(lambertw(x))");
-      E.parse(graphData.exprOpts);
-      return E;
-    })(),
+    type: "z",
+    expr: createNewExpression(graphData, "x**x").parse(),
     color: '#ff0000'
   }, graphData);
-  addLine({
-    type: "x",
-    expr: (function () {
-      let E = createNewExpression(graphData, "Im(lambertw(x))");
-      E.parse(graphData.exprOpts);
-      return E;
-    })(),
-    color: '#0000ff'
-  }, graphData);
+  graphData.itemListItems.push({ type: "defint", lineID: 0, a: -0.5, b: 0.5 });
+  populateLineAnalysisDiv(analysisOptionsDiv, graphData, 0, itemListContainer);
   // #endregion
 
   populateItemList(itemListContainer, graphData, analysisOptionsDiv);
@@ -260,7 +230,11 @@ function main() {
 
 /** Sets up graph and attached it to a given parent element */
 function setupGraph(parent, itemListContainer, analysisOptionsDiv) {
-  const returnObj = { parent, baseExpr: new Expression(), exprOps: undefined };
+  const returnObj = {
+    parent,
+    baseExpr: new Expression(),
+    isImag: false,
+  };
 
   const canvas = document.createElement('canvas');
   parent.appendChild(canvas);
@@ -358,7 +332,8 @@ function setupGraph(parent, itemListContainer, analysisOptionsDiv) {
           if (ldata.draw === undefined || ldata.draw) { // Don't both if line is not visible
             graph.ctx.beginPath();
             graph.ctx.fillStyle = (ldata?.color ?? "#000000") + "35";
-            plotPath(graph.ctx, data.coords);
+            if (Array.isArray(data.coords[0][0])) data.coords.forEach(coords => plotPath(graph.ctx, coords));
+            else plotPath(graph.ctx, data.coords);
             graph.ctx.fill();
           }
         }
@@ -583,9 +558,8 @@ function setupGraph(parent, itemListContainer, analysisOptionsDiv) {
   globalThis.pi = Math.PI;
   globalThis.e = Math.E;
 
-  // Function map
-  const funcs = new Map(); // funcname: string => { fn: Function, args: string[], source: string, visible: boolean }
-  returnObj.funcs = funcs;
+  // Contains set of all user-defined functions
+  returnObj.funcs = new Set();
 
   return returnObj;
 }
@@ -602,10 +576,10 @@ function addLine(lineData, graphData) {
 
 /** Create and return Expression object for type 'z' */
 function createNewExpression(graphData, expr = undefined) {
-  let E = graphData.baseExpr.copy(expr);
-  E._symbols = graphData.baseExpr._symbols;
-  // E.numberOpts.imag = "i";
-  // E.setSymbol(E.numberOpts.imag, Complex.I);
+  let E = new Expression(expr);
+  E.constSymbols = graphData.baseExpr.constSymbols;
+  E.operators = graphData.baseExpr.operators;
+  E.numberOpts = graphData.baseExpr.numberOpts;
   return E;
 }
 
@@ -633,53 +607,27 @@ function setConstant(graphData, name, value) {
   } else {
     graphData.constants.set(name, { value });
   }
-  graphData.baseExpr.setSymbol(name, value);
+  graphData.baseExpr.constSymbols.set(name, value);
 }
 
 /** Remove a constant */
 function removeConstant(graphData, name) {
   if (graphData.constants.has(name)) {
     graphData.constants.delete(name);
-    graphData.baseExpr.delSymbol(name);
+    graphData.baseExpr.constSymbols.delete(name);
   }
 }
 
-/** Create/update a function */
-function setFunction(graphData, name, args = undefined, source = undefined, visible = undefined) {
-  if (graphData.funcs.has(name)) {
-    const data = graphData.funcs.get(name);
-    if (args !== undefined) data.args = args;
-    if (source !== undefined) data.source = source;
-    if (visible !== undefined) data.visible = !!visible;
-    let old = data.expr.getOriginal();
-    data.expr.load(source);
-    let o = data.expr.parse(graphData.exprOpts);
-    if (o.error) {
-      alert(`Error defining function ${name}:\n${o.msg}`);
-      data.expr.load(old);
-      data.expr.parse(graphData.exprOpts);
-      return;
-    }
-  } else {
-    const data = { args, source, visible: !!visible };
-    data.expr = createNewExpression(graphData, source);
-    let o = data.expr.parse(graphData.exprOpts);
-    if (o.error) {
-      alert(`Error defining function ${name}:\n${o.msg}`);
-      return;
-    }
-    graphData.funcs.set(name, data);
-  }
-  const data = graphData.funcs.get(name);
-  graphData.baseExpr.setSymbol(name, (...args) => {
-    let map = new Map(), symbols = data.expr._symbols;
-    graphData.baseExpr._symbols.forEach((v, k) => map.set(k, v));
-    data.expr._symbols = map;
-    for (let i = 0; i < data.args.length; i++) map.set(data.args[i], args[i]);
-    let r = data.expr.evaluate();
-    data.expr._symbols = symbols;
-    return r;
-  });
+/** Create a user-defined function in baseExpr */
+function createFunction(graphData, name, args, source) {
+  let func = {
+    type: 'fn',
+    args,
+    body: source,
+  };
+  graphData.funcs.add(name);
+  graphData.baseExpr.constSymbols.set(name, func);
+  graphData.baseExpr.parseSymbol(name);
 }
 
 /** Remove a function */
@@ -809,7 +757,7 @@ function generateDefiniteIntegralCard(data, graphData, onUpdate, onRemove) {
 
   // Answer
   span.insertAdjacentHTML("beforeend", ` = `);
-  span.insertAdjacentHTML("beforeend", `<var>${typeof data.val === "number" && !isNaN(data.val) ? data.val : "?"}</var>`);
+  span.insertAdjacentHTML("beforeend", `<var>${data.val != undefined && !(graphData.isImag ? Complex.isNaN(data.val) : isNaN(data.val)) ? data.val.toString() : "?"}</var>`);
 
   const divButtons = document.createElement("div");
   divButtons.classList.add("buttons-container");
@@ -1024,7 +972,7 @@ function generateLineCard(lineID, graphData, analysisOptionsDiv, itemListContain
   btnEdit.title = 'Edit Line';
   btnEdit.classList.add("btn-edit");
   btnEdit.addEventListener('click', () => {
-    editDiv = generateLineConfigDiv(graphData.graph, lineData, () => {
+    editDiv = generateLineConfigDiv(graphData, lineData, () => {
       editDiv.remove();
       btnEdit.disabled = false;
       editDiv = undefined;
@@ -1127,12 +1075,12 @@ function generateLineCardOverview(lineID, lineData, graphData, onChange) {
   switch (lineData.type) {
     case 'x': case 'y': {
       span.innerHTML += `&#402;(&${lineData.type}scr;) = `;
-      let input = generateExpressionInput(lineData.expr, onChange, graphData.exprOpts);
+      let input = generateExpressionInput(lineData.expr, onChange);
       span.appendChild(input);
       break;
     }
     case 'z': {
-      span.innerHTML += `&#402;(&${lineData.type}scr;) = `;
+      span.innerHTML += `&#402;(&xscr;) = `;
       let input = generateExpressionInput(lineData.expr, onChange, OPERATORS_IMAG);
       span.appendChild(input);
       break;
@@ -1169,19 +1117,19 @@ function generateLineCardOverview(lineID, lineData, graphData, onChange) {
 
       let p = document.createElement("p");
       p.innerHTML = `&#402;<sub>&xscr;</sub>(${PARAMETRIC_VARIABLE}) = `;
-      p.appendChild(generateExpressionInput(lineData.exprx, onChange, graphData.exprOpts));
+      p.appendChild(generateExpressionInput(lineData.exprx, onChange));
       div.appendChild(p);
 
       p = document.createElement("p");
       p.innerHTML = `&#402;<sub>&yscr;</sub>(${PARAMETRIC_VARIABLE}) = `;
-      p.appendChild(generateExpressionInput(lineData.expry, onChange, graphData.exprOpts));
+      p.appendChild(generateExpressionInput(lineData.expry, onChange));
       div.appendChild(p);
 
       break;
     }
     case 'θ': {
       span.innerHTML += `&#402;(a) = `;
-      span.appendChild(generateExpressionInput(lineData.expr, onChange, graphData.exprOpts));
+      span.appendChild(generateExpressionInput(lineData.expr, onChange));
       break;
     }
     default:
@@ -1266,7 +1214,7 @@ function generateConfigPopup(graphData, onUpdateItemList, onChange) {
   pcThead.appendChild(pcTheadRow);
   const cols = [];
   const optsArray = [
-    { field: 'Complex Maths', col: 1, title: 'Allow arithmatic with complex numbers (must still return a real number)', type: 'boolean', get: () => graphData.exprOpts !== undefined, set: v => graphData.exprOpts = (v ? OPERATORS_IMAG : undefined) },
+    { field: 'Complex Maths', col: 1, title: 'Allow arithmatic with complex numbers (must still return a real number)', type: 'boolean', get: () => graphData.isImag, set: v => { graphData.baseExpr.operators = (v ? OPERATORS_IMAG : OPERATORS_DEFAULT); graphData.isImag = v; graphData.baseExpr.parseAllSymbols(); } },
     { field: 'Start X', col: 1, title: 'Left-most X value', type: 'number', get: () => graphData.graph.opts.xstart, set: v => graphData.graph.opts.xstart = +v },
     { field: 'X Step', col: 1, title: 'Width of gap between x-axis markers', type: 'number', get: () => graphData.graph.opts.xstep, set: v => graphData.graph.opts.xstep = +v },
     { field: 'X Step Gap', col: 1, title: 'Gap (in pixels) between each x-axis marker', type: 'number', get: () => graphData.graph.opts.xstepGap, set: v => graphData.graph.opts.xstepGap = +v },
@@ -1348,13 +1296,13 @@ function generateConfigPopup(graphData, onUpdateItemList, onChange) {
 }
 
 /** Creates and returns new <input /> which allows the editing of an Expression. NB, Expression is directly modified (if no error) */
-function generateExpressionInput(expr, onChange = undefined, parseOperators = undefined) {
+function generateExpressionInput(expr, onChange = undefined) {
   const input = document.createElement("input");
   input.type = "text";
-  input.value = expr.getOriginal();
+  input.value = expr.source;
   input.addEventListener("change", () => {
     expr.load(input.value);
-    let o = expr.parse(parseOperators);
+    let o = expr.parse();
     if (o.error) {
       alert(`Error defining function:\n${o.msg}`);
     } else if (onChange) {
@@ -1436,13 +1384,13 @@ function generateLineConfigDiv(graphData, lineData, callback, btnType = 0) {
       // Define function if not defined
       if (!lineData.expr) {
         lineData.expr = createNewExpression(graphData, lineData.type);
-        lineData.expr.parse(graphData.exprOpts);
+        lineData.expr.parse();
       }
 
       let el = document.createElement("p");
       div.appendChild(el);
       el.innerHTML = `&#402;(&${lineData.type}scr;) = `;
-      let input = generateExpressionInput(lineData.expr, undefined, graphData.exprOpts);
+      let input = generateExpressionInput(lineData.expr);
       el.appendChild(input);
 
       el = document.createElement("p");
@@ -1455,13 +1403,13 @@ function generateLineConfigDiv(graphData, lineData, callback, btnType = 0) {
     case 'z': {
       // Define function if not defined
       if (!lineData.expr) {
-        lineData.expr = createNewExpression(graphData, lineData.type);
+        lineData.expr = createNewExpression(graphData, 'x');
         lineData.expr.parse(OPERATORS_IMAG);
       }
 
       let el = document.createElement("p");
       div.appendChild(el);
-      el.innerHTML = `&#402;(&${lineData.type}scr;) = `;
+      el.innerHTML = `&#402;(&xscr;) = `;
       let inputEquation = generateExpressionInput(lineData.expr, undefined, OPERATORS_IMAG)
       el.appendChild(inputEquation);
 
@@ -1473,19 +1421,19 @@ function generateLineConfigDiv(graphData, lineData, callback, btnType = 0) {
       break;
     }
     case '~': {
+      console.log(lineData)
       if (!lineData.expr) {
-        lineData.expr = createNewExpression(graphData, "0");
-        lineData.expr.parse(graphData.exprOpts);
+        lineData.expr = createNewExpression(graphData, "0").parse();
       }
       div.insertAdjacentHTML("beforeend", "<p>&#402;(&xscr;) &#8776; &#402;(&ascr;) + &#402;'(&ascr;)(&xscr;-&ascr;) + (&#402;''(&ascr;)/2!)(&xscr;-&ascr;)<sup>2</sup> + ... + (&#402;<sup>(&nscr;)</sup>(&ascr;)/&nscr;!)(&xscr;-&ascr;)<sup>&nscr;</sup></p>");
       let el = document.createElement("p");
       el.innerText = "Current Approx: ";
       let approxInput = document.createElement("input");
       approxInput.type = "text";
-      approxInput.value = lineData.expr.getOriginal();
+      approxInput.value = lineData.expr.source;
       approxInput.addEventListener("change", () => {
         lineData.expr.load(approxInput.value);
-        let o = lineData.expr.parse(graphData.exprOpts);
+        let o = lineData.expr.parse();
         if (o.error) {
           alert(`Error in expression:\n${o.msg}`);
         }
@@ -1533,18 +1481,18 @@ function generateLineConfigDiv(graphData, lineData, callback, btnType = 0) {
     case 'e': {
       if (!lineData.lhs) {
         lineData.lhs = createNewExpression(graphData, "x");
-        lineData.lhs.parse(graphData.exprOpts);
+        lineData.lhs.parse();
       }
       if (!lineData.rhs) {
         lineData.rhs = createNewExpression(graphData, "y");
-        lineData.rhs.parse(graphData.exprOpts);
+        lineData.rhs.parse();
       }
 
       let el = document.createElement("p");
       div.appendChild(el);
-      el.appendChild(generateExpressionInput(lineData.lhs, undefined, graphData.exprOpts));
+      el.appendChild(generateExpressionInput(lineData.lhs));
       el.insertAdjacentHTML("beforeend", " = ");
-      el.appendChild(generateExpressionInput(lineData.rhs, undefined, graphData.exprOpts));
+      el.appendChild(generateExpressionInput(lineData.rhs));
       break;
     }
     case 'θ': {
@@ -1557,7 +1505,7 @@ function generateLineConfigDiv(graphData, lineData, callback, btnType = 0) {
       let el = document.createElement("p");
       div.appendChild(el);
       el.innerHTML = `&#402;(a) = `;
-      el.appendChild(generateExpressionInput(lineData.expr, undefined, graphData.exprOpts));
+      el.appendChild(generateExpressionInput(lineData.expr));
 
       el = document.createElement("p");
       let inputRangeMin = document.createElement("input");
@@ -1619,21 +1567,21 @@ function generateLineConfigDiv(graphData, lineData, callback, btnType = 0) {
       lineData.range ??= [-2, 2];
       if (!lineData.exprx) {
         lineData.exprx = createNewExpression(graphData, PARAMETRIC_VARIABLE);
-        lineData.exprx.parse(graphData.exprOpts);
+        lineData.exprx.parse();
       }
       if (!lineData.expry) {
         lineData.expry = createNewExpression(graphData, PARAMETRIC_VARIABLE);
-        lineData.expry.parse(graphData.exprOpts);
+        lineData.expry.parse();
       }
 
       let el = document.createElement("p");
       el.innerHTML = `&#402;<sub>&xscr;</sub>(${PARAMETRIC_VARIABLE}) = `;
-      el.appendChild(generateExpressionInput(lineData.exprx, undefined, graphData.exprOpts));
+      el.appendChild(generateExpressionInput(lineData.exprx, undefined));
       div.appendChild(el);
 
       el = document.createElement("p");
       el.innerHTML = `&#402;<sub>&yscr;</sub>(${PARAMETRIC_VARIABLE}) = `;
-      el.appendChild(generateExpressionInput(lineData.expry, undefined, graphData.exprOpts));
+      el.appendChild(generateExpressionInput(lineData.expry, undefined));
       div.appendChild(el);
 
       el = document.createElement("p");
@@ -2064,21 +2012,6 @@ function populateLineAnalysisDiv(parent, graphData, lineID, itemListContainer) {
   }));
   // Integrate between limits
   divCalculus.appendChild(createButton("&int;<span class=\"sub-sup\"><sup>b</sup><sub>a</sub></span>&nbsp;&nbsp;&nbsp;", "Integrate between limits - find area under curve", () => {
-    // let bounds = prompt(`Find area under curve between bounds\nFormat: <a>, <b>`, '0, 1');
-    // if (bounds) {
-    //   let [a, b] = bounds.split(',').map(n => eval(n));
-    //   if (b < a) return alert(`Invalid bound relationship`);
-    //   let obj = { path: undefined };
-    //   let area = graphData.graph.getArea(lineID, a, b, graphData.settings.integrateLimitsN, obj);
-    //   if (area === undefined) alert(`Area ${a}-${b} is undefined`);
-    //   else if (isNaN(area)) alert(`Unable to calculate area ${a}-${b}`);
-    //   else {
-    //     alert(area);
-    //     graphData.lines.get(lineID).shadeArea = obj.path;
-    //     graphData.renderParams.caches.shadeArea.update = true;
-    //     graphData.renderParams.update = true;
-    //   }
-    // }
     graphData.itemListItems.push({ type: "defint", lineID, a: 0, b: 1, step: 0.5 });
     populateItemList(itemListContainer, graphData, parent);
     graphData.renderParams.caches.shadeArea.update = true;
@@ -2086,7 +2019,7 @@ function populateLineAnalysisDiv(parent, graphData, lineID, itemListContainer) {
   }));
   // Approximate
   divCalculus.appendChild(createButton("~", "Approximate function using Taylor series", () => {
-    addLine({ type: '~', id: lineID, degree: 3, C: 0 }, graphData); // Taylor approximation of 3rd degree
+    addLine({ type: '~', id: lineID, degree: 3, C: 0, expr: createNewExpression(graphData) }, graphData); // Taylor approximation of 3rd degree
     populateItemList(itemListContainer, graphData, parent);
     graphData.renderParams.caches.line.update = true;
     graphData.renderParams.update = true;
@@ -2195,17 +2128,17 @@ function generateFunctionPopup(graphData, onChange) {
   container.appendChild(table);
   const tbody = table.createTBody();
   function createRow(name) {
-    const tr = document.createElement("tr"), info = graphData.funcs.get(name);
+    const tr = document.createElement("tr"), info = graphData.baseExpr.constSymbols.get(name);
     tr.insertAdjacentHTML("beforeend", `<th>${name}</th>`);
     let td = document.createElement("td");
     let inpArguments = document.createElement("input");
     inpArguments.value = info.args.join(', ');
     inpArguments.title = 'Function arguments seperated by commas';
     inpArguments.addEventListener('change', () => {
-      info.args = inpArguments.value.split(',').map(x => x.trim());
+      info.args = inpArguments.value.split(',').map(x => x.trim()).filter(x => x.length > 0);
       inpArguments.value = info.args.join(', ');
-      addFunc(name, info.args, info.source);
-      setFunction(graphData, name, info.args, info.source);
+      graphData.baseExpr.parseSymbol(name);
+      if (graphData.baseExpr.error) return alert(graphData.baseExpr.handleError());
       onChange();
     });
     td.appendChild(inpArguments);
@@ -2213,12 +2146,12 @@ function generateFunctionPopup(graphData, onChange) {
 
     td = document.createElement("td");
     let inpBody = document.createElement("input");
-    inpBody.value = info.source.trim();
+    inpBody.value = info.body.trim();
     inpBody.title = 'Function body';
     inpBody.addEventListener('change', () => {
-      info.source = inpBody.value.trim();
-      inpBody.value = info.source;
-      setFunction(graphData, name, info.args, info.source);
+      info.body = inpBody.value = inpBody.value.trim();
+      graphData.baseExpr.parseSymbol(name);
+      if (graphData.baseExpr.error) return alert(graphData.baseExpr.handleError());
       onChange();
     });
     td.appendChild(inpBody);
@@ -2237,19 +2170,16 @@ function generateFunctionPopup(graphData, onChange) {
     return tr;
   }
 
-  graphData.funcs.forEach((obj, name) => {
-    if (obj.visible) tbody.appendChild(createRow(name));
-  });
+  graphData.funcs.forEach(name => tbody.appendChild(createRow(name)));
   let tfoot = table.createTFoot(), tr = document.createElement("tr"), td = document.createElement("td"), newBtn = document.createElement("button");
   table.appendChild(tfoot);
   newBtn.innerHTML = '&plus; Define Function';
   newBtn.addEventListener('click', () => {
     let name = prompt('Enter function name');
     if (name) {
-      if (!CONSTANT_SYM_REGEX.test(name)) return alert(`Invalid function name - must match ${CONSTANT_SYM_REGEX}`);
-      if (graphData.baseExpr.hasSymbol(name)) return alert(`Symbol ${name} already in use`);
-      setFunction(graphData, name, ['x'], 'x', true);
-      console.log(graphData)
+      if (!name.match(CONSTANT_SYM_REGEX)) return alert(`Invalid function name - must match ${CONSTANT_SYM_REGEX}`);
+      if (graphData.baseExpr.hasSymbol(name)) return alert(`Symbol ${name} is already in use`);
+      createFunction(graphData, name, ['x'], 'x', true);
       tbody.appendChild(createRow(name));
       onChange();
     }

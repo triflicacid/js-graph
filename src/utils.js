@@ -87,7 +87,7 @@ export function lerpCoords(coords, dist) {
   return coords;
 }
 
-/** Default: base e */
+/** Log base `b` of `a`. Default: base e */
 export function log(a, b = undefined) {
   if (b === undefined) return Math.log(a);
   else return Math.log(a) / Math.log(b);

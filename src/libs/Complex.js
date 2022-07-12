@@ -369,19 +369,35 @@ export class Complex {
   }
   /** Return ceiling of a number */
   static ceil(z_) {
+    if (z_ instanceof Complex) z_ = z_.copy();
     return _zapply(z_, Math.ceil);
   }
   /** Return floor of a number */
   static floor(z_) {
+    if (z_ instanceof Complex) z_ = z_.copy();
     return _zapply(z_, Math.floor);
   }
   /** Return rounded value of z to specified decimal places, or to whole integer */
   static round(z_, dp_) {
+    if (z_ instanceof Complex)
+      z_ = z_.copy();
     if (dp_ === undefined)
       return _zapply(z_, Math.round);
     const z = Complex.parse(z_);
     const K = Math.pow(10, dp_);
     return new Complex(Math.round(z.a * K) / K, Math.round(z.b * K) / K);
+  }
+  /**
+   * Return the sign of a given complex number `z` lexigraphically
+   * - Return `sign(Re(z))` if `Im(z) = 0`
+   * - Return `sign(Im(z))` if `Im(z) = 0`
+   * - Else, return undefined
+  */
+  static sign(z_) {
+    const z = Complex.parse(z_);
+    if (z.b === 0) return Math.sign(z.a);
+    if (z.a === 0) return Math.sign(z.b);
+    return undefined;
   }
   /** Calculate Math.exp of a complex number */
   static exp(z_) {

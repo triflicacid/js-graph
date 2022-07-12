@@ -1,5 +1,5 @@
 import { Point } from "./Point.js";
-import { lerpCoords, plotPath, roundMultiple, roundTowards0, roundTowardsInf } from "./utils.js";
+import { lerpCoords, roundMultiple, roundTowards0, roundTowardsInf } from "./utils.js";
 import * as gutils from "./graph-utils.js";
 import { Complex } from "./libs/Complex.js";
 
@@ -290,12 +290,20 @@ export class Graph {
         data.draw ??= true;
         let coords = this.generateCoords(id);
         data.coords = coords;
-        if (!data.draw) continue;
-        coords = coords.map(([x, y]) => this.getCoordinates(x, y));
-        if (!data.error) {
-          if (coords.length !== 0) {
-            this._plotPoints(coords, data);
-          }
+        if (!data.draw || data.error) continue;
+        if (data.type === 'z') {
+          // REAL part
+          const rcoords = coords.filter(([x, y]) => y !== undefined).map(([x, y]) => this.getCoordinates(x, y));
+          this._plotPoints(rcoords, data);
+          // IMAGINARY part
+          const icoords = coords.filter(([x, _, y]) => y !== undefined).map(([x, _, y]) => this.getCoordinates(x, y));
+          const col = data.color;
+          data.color += '5f';
+          this._plotPoints(icoords, data);
+          data.color = col;
+        } else {
+          coords = coords.map(([x, y]) => this.getCoordinates(x, y));
+          this._plotPoints(coords, data);
         }
       }
     }
@@ -349,27 +357,27 @@ export class Graph {
         switch (data.type) {
           case 'x': { // Control the x-coordinate
             inc = xAxisSpan / ncoords;
-            let o;
             for (let i = 0, x = opts.xstart; i < ncoords; ++i, x += inc) {
               data.expr.setSymbol("x", x);
-              o = data.expr.evaluate();
-              if (o.error) break;
-              if (Graph.validCoordinates(x, o.value)) coords.push([x, o.value]);
+              let y = data.expr.evaluate();
+              if (data.expr.error) break;
+              if (y.b !== undefined) y = y.a;
+              if (Graph.validCoordinates(x, y)) coords.push([x, y]);
             }
-            if (o.error) data.emsg = o.msg;
+            if (data.expr.error) data.emsg = data.expr.handleError();
             break;
           }
           case 'y': { // Control the y-coordinate
             inc = yAxisSpan / ncoords;
             opts.ystart ??= this.opts.ystart;
-            let o;
             for (let i = 0, y = opts.ystart; i < ncoords; ++i, y -= inc) {
               data.expr.setSymbol("y", y);
-              o = data.expr.evaluate();
-              if (o.error) break;
-              if (Graph.validCoordinates(o.value, y)) coords.push([o.value, y]);
+              let x = data.expr.evaluate();
+              if (data.expr.error) break;
+              if (x.b !== undefined) x = x.a;
+              if (Graph.validCoordinates(x, y)) coords.push([x, y]);
             }
-            if (o.error) data.emsg = o.msg;
+            if (data.expr.error) data.emsg = data.expr.handleError();
             break;
           }
           case 'p': { // Control a parameter
@@ -380,17 +388,19 @@ export class Graph {
               break;
             }
             inc = data.range[2] ?? (Math.abs(data.range[1] - data.range[0]) / ncoords);
-            let o;
             for (let i = 0, p = data.range[0], x, y; p <= data.range[1]; ++i, p += inc) {
               data.exprx.setSymbol("p", p);
-              o = data.exprx.evaluate();
-              if (o.error) break; else x = o.value;
+              let x = data.exprx.evaluate();
+              if (data.exprx.error) break;
+              if (x.b !== undefined) x = x.a;
               data.expry.setSymbol("p", p);
-              o = data.expry.evaluate();
-              if (o.error) break; else y = o.value;
+              let y = data.expry.evaluate();
+              if (data.expry.error) break;
+              if (y.b !== undefined) y = y.a;
               if (Graph.validCoordinates(x, y)) coords.push([x, y]);
             }
-            if (o.error) data.emsg = o.msg;
+            if (data.exprx.error) data.emsg = data.exprx.handleError();
+            else if (data.expry.error) data.emsg = data.expry.handleError();
             break;
           }
           case 'd': { // Plot gradient of another function
@@ -480,14 +490,14 @@ export class Graph {
           case 'θ': { // Polar
             if (!data.range) data.range = [0, 2 * Math.PI];
             inc = data.range[2] ?? (Math.abs(data.range[1] - data.range[0]) / ncoords);
-            let o;
             for (let i = 0, θ = data.range[0]; θ <= data.range[1]; ++i, θ += inc) {
               data.expr.setSymbol("a", θ);
-              o = data.expr.evaluate();
-              if (o.error) break;
-              if (!isNaN(o.value) && isFinite(o.value)) coords.push([o.value * Math.cos(θ), o.value * Math.sin(θ)]);
+              let r = data.expr.evaluate();
+              if (data.expr.error) break;
+              if (r.b !== undefined) r = r.a;
+              if (!isNaN(r) && isFinite(r)) coords.push([r * Math.cos(θ), r * Math.sin(θ)]);
             }
-            if (o.error) data.emsg = o.msg;
+            if (data.expr.error) data.emsg = data.expr.handleError();
             break;
           }
           case 'c': // Coords
@@ -495,23 +505,23 @@ export class Graph {
             data.drawAll = true;
             break;
           case 'e': {
-            let D = 0.04, o;
+            let D = 0.04;
             for (let h = 0; h < this.height; h += 1) {
               for (let w = 0; w < this.width; w += 1) {
-                let [x, y] = this.fromCoordinates(w, h), lhs, rhs;
+                let [x, y] = this.fromCoordinates(w, h);
                 data.lhs.setSymbol("x", x).setSymbol("y", y);
-                o = data.lhs.evaluate();
-                if (o.error) break; else lhs = o.value;
+                let lhs = data.lhs.evaluate();
+                if (data.expr.error) break;
                 data.rhs.setSymbol("x", x).setSymbol("y", y);
-                o = data.rhs.evaluate();
-                if (o.error) break; else rhs = o.value;
+                let rhs = data.rhs.evaluate();
+                if (data.expr.error) break;
                 if (Math.abs(lhs - rhs) <= D) {
                   coords.push([x, y]);
                 }
               }
-              if (o.error) break;
+              if (data.expr.error) break;
             }
-            if (o.error) data.emsg = o.msg;
+            if (data.expr.error) data.emsg = data.expr.handleError();
             break;
           }
           case '~': {
@@ -521,33 +531,39 @@ export class Graph {
               data.emsg = 'Unknown line with ID ' + data.id;
               break;
             }
+            if (data.expr === undefined) {
+              data.emsg = 'Expression object uninitialised.';
+              break;
+            }
             const approxStr = this.taylorApprox(data.id, data.degree, data.C);
             data.expr.load(approxStr);
-            let o = data.expr.parse();
-            if (o.error) {
+            data.expr.parse();
+            if (data.expr.error) {
               data.emsg = 'Unable to create Taylor approximation. Does this curve exist at <a=' + data.C + '>?';
               break;
             }
             const inc = xAxisSpan / ncoords;
             for (let i = 0, x = opts.xstart; i < ncoords; ++i, x += inc) {
               data.expr.setSymbol("x", x);
-              o = data.expr.evaluate();
-              if (o.error) break;
-              if (Graph.validCoordinates(x, o.value)) coords.push([x, o.value]);
+              let y = data.expr.evaluate();
+              if (data.expr.error) break;
+              if (Graph.validCoordinates(x, y)) coords.push([x, y]);
             }
-            if (o.error) data.emsg = o.msg;
+            if (data.expr.error) data.emsg = data.expr.handleError();
             break;
           }
           case 'z': {
+            // coords = [x, Re(z), Im(z)]
             inc = xAxisSpan / ncoords;
-            let o;
             for (var i = 0, x = opts.xstart; i < ncoords; ++i, x += inc) {
-              data.fn.setSymbol('z', new Complex(x));
-              o = data.fn.evaluate();
-              if (o.error) break;
-              if (Graph.validCoordinates(o.value.a, o.value.b)) coords.push([o.value.a, o.value.b]);
+              data.expr.setSymbol('x', new Complex(x));
+              let z = data.expr.evaluate();
+              if (data.expr.error) break;
+              let aok = Graph.validCoordinates(x, z.a);
+              let bok = Graph.validCoordinates(x, z.b);
+              if (aok || bok) coords.push([x, aok ? z.a : undefined, bok ? z.b : undefined]);
             }
-            if (o.error) data.emsg = o.msg;
+            if (data.expr.error) data.emsg = data.expr.handleError();
             break;
           }
           default:
@@ -701,7 +717,7 @@ export class Graph {
         const h = (b - a) / n, coords = [];
         for (let x = a; x <= b; x += h) { // Generate coordinates
           line.expr.setSymbol("x", x);
-          let { value: y } = line.expr.evaluate();
+          let y = line.expr.evaluate();
           if (Graph.validCoordinates(x, y)) coords.push([x, y]);
         }
         let area = 0; // Area of curve excluding edge trapeziums
@@ -722,7 +738,7 @@ export class Graph {
         const h = (b - a) / n, coords = [];
         for (let y = a; y <= b; y += h) { // Generate coordinates
           line.expr.setSymbol("y", y);
-          let { value: x } = line.expr.evaluate();
+          let x = line.expr.evaluate();
           if (Graph.validCoordinates(x, y)) coords.push([x, y]);
         }
         let area = 0; // Area of curve excluding edge trapeziums
@@ -744,7 +760,7 @@ export class Graph {
         const α = (b - a) / n, coords = []; // Angle
         for (let θ = a; θ <= b; θ += α) {
           line.expr.setSymbol("a", θ);
-          let { value: r } = line.expr.evaluate();
+          let r = line.expr.evaluate();
           if (!isNaN(r) && isFinite(r)) {
             let x = r * Math.cos(θ), y = r * Math.sin(θ);
             coords.push([x, y]);
@@ -764,7 +780,9 @@ export class Graph {
       } else if (line.type === 'p') {
         const h = (b - a) / n, coords = [];
         for (let p = a; p <= b; p += h) {
-          let x = line.fnx(p), y = line.fny(p);
+          line.exprx.setSymbol("p", p);
+          line.expry.setSymbol("p", p);
+          let x = line.exprx.evaluate(), y = line.expry.evaluate();
           if (Graph.validCoordinates(x, y)) coords.push([x, y]);
         }
         let A = 0;
@@ -781,25 +799,51 @@ export class Graph {
         return A;
       }
     }
-    // Use coordinate array
-    let coords = line.coords,
-      secStart = gutils.getCorrepondingCoordinateIndex(a, 'x', coords, false),
-      secEnd = gutils.getCorrepondingCoordinateIndex(b, 'x', coords, false);
-    coords = secStart <= secEnd ? coords.slice(secStart, secEnd + 1) : coords.slice(secEnd, secStart + 1);
-    let area = 0; // Area of curve exuding edge trapeziums
-    for (let i = 1; i < coords.length - 1; ++i) area += coords[i][1];
-    let A = 0.5 * ((b - a) / coords.length) * ((coords[0][1] + coords[coords.length - 1][1]) + 2 * area);
-    // Populate <areaPath>
-    let points = coords.map(([x, y]) => this.getCoordinates(x, y));
-    const ORIGIN = this.getCoordinates(0, 0);
-    obj.path = [
-      ORIGIN,
-      [points[0][0], ORIGIN[1]],
-      ...points,
-      [points[points.length - 1][0], ORIGIN[1]],
-      [points[0][0], ORIGIN[1]]
-    ];
-    return A;
+
+    // Use co-ordinates themselves
+    if (line.type === 'z') { // COMPLEX: BOTH REAL AND IMAGINARY PARTS
+      // Real, and imaginary
+      let coords = line.coords,
+        secStart = gutils.getCorrepondingCoordinateIndex(a, 'x', coords, false),
+        secEnd = gutils.getCorrepondingCoordinateIndex(b, 'x', coords, false);
+      coords = secStart <= secEnd ? coords.slice(secStart, secEnd + 1) : coords.slice(secEnd, secStart + 1);
+      let re = gutils.getArea(coords), im = gutils.getArea(coords.map(([x, _, i]) => ([x, i])));
+      // Populate <areaPath>
+      let points = coords.map(([x, y]) => this.getCoordinates(x, y));
+      const ORIGIN = this.getCoordinates(0, 0);
+      obj.path = [[ // REAL payh
+        ORIGIN,
+        [points[0][0], ORIGIN[1]],
+        ...points,
+        [points[points.length - 1][0], ORIGIN[1]],
+        [points[0][0], ORIGIN[1]]
+      ]];
+      points = coords.map(([x, _, y]) => this.getCoordinates(x, y));
+      obj.path[1] = [ // IMAG path
+        ORIGIN,
+        [points[0][0], ORIGIN[1]],
+        ...points,
+        [points[points.length - 1][0], ORIGIN[1]],
+        [points[0][0], ORIGIN[1]]
+      ];
+      return new Complex(re, im);
+    } else {
+      let coords = line.coords,
+        secStart = gutils.getCorrepondingCoordinateIndex(a, 'x', coords, false),
+        secEnd = gutils.getCorrepondingCoordinateIndex(b, 'x', coords, false);
+      coords = secStart <= secEnd ? coords.slice(secStart, secEnd + 1) : coords.slice(secEnd, secStart + 1);
+      // Populate <areaPath>
+      let points = coords.map(([x, y]) => this.getCoordinates(x, y));
+      const ORIGIN = this.getCoordinates(0, 0);
+      obj.path = [
+        ORIGIN,
+        [points[0][0], ORIGIN[1]],
+        ...points,
+        [points[points.length - 1][0], ORIGIN[1]],
+        [points[0][0], ORIGIN[1]]
+      ];
+      return gutils.getArea(coords);
+    }
   }
 
   /** Get intercepts between two lines (or coordinate arrays) */
