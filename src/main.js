@@ -1,8 +1,8 @@
 import { Graph } from "./Graph.js";
 import { Point } from "./Point.js";
 import Popup from "./Popup.js";
-import { HEX_ALPHA, extractCoords, round, clamp, createButton, log, random, factorial, plotPath } from "./utils.js";
-import { getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getAudioFromCoords, hsl2rgb } from "./graph-utils.js";
+import { HEX_ALPHA, extractCoords, round, clamp, createButton, random, factorial, plotPath } from "./utils.js";
+import { getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getAudioFromCoords } from "./graph-utils.js";
 import { Expression, OPERATORS_DEFAULT, OPERATORS_IMAG } from "./libs/Expression.js";
 import { Complex } from "./libs/Complex.js";
 import { lambertw_scalar } from "./libs/lambertw.js";
@@ -147,7 +147,8 @@ function main() {
     if (playingAll) { // Start playing sound of all sources
       const promises = [];
       graphData.graph.getLines().forEach((lineID) => {
-        if (graphData.graph.getLine(lineID).draw !== false) {
+        const data = graphData.graph.getLine(lineID);
+        if (data.draw !== false && data.type !== 'z2') {
           const promise = playAudioForLine(graphData, lineID);
           promises.push(promise);
         }
@@ -220,7 +221,7 @@ function main() {
   // #region USER CODE
   addLine({
     type: "z2",
-    expr: createNewExpression(graphData, "z**z").parse(),
+    expr: createNewExpression(graphData, "sin(z)").parse(),
   }, graphData);
   // graphData.itemListItems.push({ type: "defint", lineID: 0, a: -0.5, b: 0.5 });
   populateLineAnalysisDiv(analysisOptionsDiv, graphData, 0, itemListContainer);
@@ -2030,6 +2031,41 @@ function populateLineAnalysisDiv(parent, graphData, lineID, itemListContainer) {
   parent.innerHTML = `<span class='line-id'>ID ${lineID}</span>`;
   const lineData = graphData.graph.getLine(lineID);
   let input, btn;
+
+  if (lineData.type === 'z2') { // Special
+    const divGen = document.createElement('div');
+    divGen.appendChild(createButton("Roots", "Find roots of complex map", () => {
+      // TODO: RETURNS FALSE POSITIVES
+      let roots = [], lastB, w = graphData.graph.width;
+      lastB = lineData.coords[0][0].b;
+
+      for (let i = w; i < lineData.coords.length - w; ++i) {
+        const [zIn, zOut] = lineData.coords[i];
+        if (Math.abs(zIn.b - lastB) <= Number.EPSILON) {
+          let zUp = lineData.coords[i - w][1];
+          let zDown = lineData.coords[i + w][1];
+          let zLeft = lineData.coords[i - 1][1];
+          let zRight = lineData.coords[i + 1][1];
+          let zOutMag = zOut.getMag();
+          if (Math.sign(zLeft.getMag() - zOutMag) === -Math.sign(zOutMag - zRight.getMag()) && Math.sign(zUp.getMag() - zOutMag) === -Math.sign(zOutMag - zDown.getMag())) {
+            roots.push(i);
+          }
+        }
+        lastB = zIn.b;
+      }
+
+      graphData.graph.addPoints(roots.map(i => {
+        const z = lineData.coords[i][0];
+        return { lineID, typeID: 6, x: z.a, y: z.b };
+      }));
+      // Update canvas
+      // graphData.renderParams.caches.line.update = true;
+      graphData.renderParams.caches.points.update = true;
+      graphData.renderParams.update = true;
+    }));
+    parent.appendChild(divGen);
+    return;
+  }
 
   // Calculus
   const divCalculus = document.createElement("div");

@@ -116,7 +116,9 @@ export class Graph {
       if (arg instanceof Point) {
         this._points.push(arg);
       } else {
-        this._points.push(new Point(arg.lineID, arg.typeID, +arg.x, +arg.y));
+        let P = new Point(arg.lineID, arg.typeID, +arg.x, +arg.y);
+        if (arg.string) P.string = arg.string;
+        this._points.push(P);
       }
     }
   }
@@ -673,18 +675,20 @@ export class Graph {
 
   plotComplexField(data) {
     data.error = false;
-    let outs = []; // [mag, theta][]
+    const outs = []; // [Input, Output][]
+    const outsN = []; // [zOutMag, zOutArg][]
     let maxMag = -1;
     for (let x = 0; x < this.width; x++) {
       for (let y = 0; y < this.height; y++) {
-        let idx = x + y * this.width;
-        let [a, b] = this.fromCoordinates(x, y), z = new Complex(a, b);
-        data.expr.setSymbol("z", z);
-        let out = data.expr.evaluate();
+        const idx = x + y * this.width;
+        const [a, b] = this.fromCoordinates(x, y), zIn = new Complex(a, b);
+        data.expr.setSymbol("z", zIn);
+        const zOut = data.expr.evaluate();
         if (data.expr.error) break;
-        let m = out.getMag(), t = out.getArg();
-        if (m > maxMag) maxMag = m;
-        outs[idx] = [m, t];
+        const mag = zOut.getMag(), arg = zOut.getArg();
+        if (mag > maxMag) maxMag = mag;
+        outs[idx] = [zIn, zOut];
+        outsN[idx] = [mag, arg];
       }
       if (data.expr.error) break;
     }
@@ -699,8 +703,9 @@ export class Graph {
     for (let x = 0; x < this.width; x++) {
       for (let y = 0; y < this.height; y++) {
         let idx = 4 * (x + y * this.width);
-        let [mag, theta] = outs[x + y * this.width];
-        let hu = theta < 0 ? 360 + theta / Math.PI * 180 : theta / Math.PI * 180;
+        // let [zIn, zOut] = outs[x + y * this.width];
+        let [mag, arg] = outsN[x + y * this.width];
+        let hu = arg < 0 ? 360 + arg / Math.PI * 180 : arg / Math.PI * 180;
         let bright = data.C ? mag / maxMag * 75 : 50;
         let rgb = gutils.hsl2rgb(hu, 100, bright);
         img.data[idx] = rgb[0];

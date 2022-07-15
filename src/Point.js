@@ -7,6 +7,7 @@ export class Point {
         // NB coordinates are translated coordinates on canvas
         this.x = x;
         this.y = y;
+        this.string = undefined;
         this.flag = false;
     }
 
@@ -16,15 +17,16 @@ export class Point {
 
     toString() {
         const t = Point.types[this.typeID];
-        return (t ? `${t}: ` : '') + (isNaN(Point.roundDp) ? `(${this.x}, ${this.y})` : `(${round(this.x, Point.roundDp)}, ${round(this.y, Point.roundDp)})`);
+        return (t ? `${t} ` : '') + (this.string ? this.string : (isNaN(Point.roundDp) ? `(${this.x}, ${this.y})` : `(${round(this.x, Point.roundDp)}, ${round(this.y, Point.roundDp)})`));
     }
 
     display(ctx, transformCoords) {
         ctx.beginPath();
         ctx.fillStyle = "red";
+        if (this.typeID === 6) ctx.fillStyle = "white";
         let [x, y] = transformCoords(this.x, this.y);
         const r = Point.radius * (this.flag ? 2 : 1);
-        ctx.arc(x, y, r, 0, 2*Math.PI);
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
         ctx.fill();
         if (this.flag) {
             const text = this.toString();
@@ -45,12 +47,13 @@ export class Point {
 }
 
 Point.types = {
-    0: 'Y-Intercept',
-    1: 'Root',
-    2: 'Minimum',
-    3: 'Maximum',
-    4: 'Turning',
-    5: 'Intercept',
+    0: 'Y-Intercept:',
+    1: 'Root:',
+    2: 'Minimum:',
+    3: 'Maximum:',
+    4: 'Turning:',
+    5: 'Intercept:',
+    6: 'z =',
 };
 Point.radius = 3;
 Point.roundDp = 2;
