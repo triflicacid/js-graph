@@ -2,7 +2,7 @@ import { Graph } from "./Graph.js";
 import { Point } from "./Point.js";
 import Popup from "./Popup.js";
 import { HEX_ALPHA, extractCoords, round, clamp, createButton, log, random, factorial, plotPath } from "./utils.js";
-import { getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getAudioFromCoords } from "./graph-utils.js";
+import { getCorrespondingCoordinate, getCorrepondingCoordinateIndex, getAudioFromCoords, hsl2rgb } from "./graph-utils.js";
 import { Expression, OPERATORS_DEFAULT, OPERATORS_IMAG } from "./libs/Expression.js";
 import { Complex } from "./libs/Complex.js";
 import { lambertw_scalar } from "./libs/lambertw.js";
@@ -20,6 +20,7 @@ const LINE_TYPES = {
   'x': 'x-coordinates',
   'y': 'y-coordinates',
   'z': 'complex',
+  'z2': 'complex map',
   'θ': 'polar',
   '~': 'approximation'
 };
@@ -36,6 +37,7 @@ const LINE_DESCRIPTIONS = {
   'x': 'x-coordinates are controlled and passed to function which returns y-coordinate',
   'y': 'y-coordinates are controlled and passed to function which returns x-coordinate',
   'z': 'x-coordinates are controlled and passed to a function which return a complex number z=a+bi. Seperatly plot [x, Re(z)] and [x, Im(z)]',
+  'z2': 'For every point on the complex plane, z=a+bi, produce f(z). At point [a,b], color according to the arg(f(z)).',
   'θ': 'Polar: a is an angle in radians with the polar point [fn(a), a] being plotted.',
   '~': 'Approximate function around a point using the Taylor series',
 };
@@ -203,7 +205,7 @@ function main() {
   // graphData.baseExpr.constSymbols.set('clamp', clamp);
   graphData.baseExpr.constSymbols.set('rand', (a, b) => graphData.isImag ? new Complex(random(a.a, b.a)) : random(a, b));
   graphData.baseExpr.constSymbols.set('factorial', a => graphData.isImag ? new Complex(factorial(a.a)) : factorial(a));
-  graphData.baseExpr.constSymbols.set('lambertw', (x) => lambertw_scalar(new Complex(x), 0, 1e-8));
+  graphData.baseExpr.constSymbols.set('lambertw', (x) => lambertw_scalar(graphData.isImag ? x : new Complex(x), 0, 1e-8));
   graphData.baseExpr.constSymbols.set('Re', z => z.a);
   graphData.baseExpr.constSymbols.set('Im', z => z.b);
 
@@ -217,11 +219,10 @@ function main() {
 
   // #region USER CODE
   addLine({
-    type: "z",
-    expr: createNewExpression(graphData, "x**x").parse(),
-    color: '#ff0000'
+    type: "z2",
+    expr: createNewExpression(graphData, "z**z").parse(),
   }, graphData);
-  graphData.itemListItems.push({ type: "defint", lineID: 0, a: -0.5, b: 0.5 });
+  // graphData.itemListItems.push({ type: "defint", lineID: 0, a: -0.5, b: 0.5 });
   populateLineAnalysisDiv(analysisOptionsDiv, graphData, 0, itemListContainer);
   // #endregion
 
@@ -1085,6 +1086,12 @@ function generateLineCardOverview(lineID, lineData, graphData, onChange) {
       span.appendChild(input);
       break;
     }
+    case 'z2': {
+      span.innerHTML += `&#402;(&zscr;) = `;
+      let input = generateExpressionInput(lineData.expr, onChange, OPERATORS_IMAG);
+      span.appendChild(input);
+      break;
+    }
     case '~': {
       span.innerHTML += `Approx. around &xscr; = `;
       let input = document.createElement("input");
@@ -1420,6 +1427,29 @@ function generateLineConfigDiv(graphData, lineData, callback, btnType = 0) {
       // el.appendChild(inputCond);
       break;
     }
+    case 'z2': {
+      if (!lineData.expr) {
+        lineData.expr = createNewExpression(graphData, 'z');
+        lineData.expr.parse();
+      }
+      lineData.C ??= 0;
+
+      let el = document.createElement("p");
+      div.appendChild(el);
+      el.innerHTML = `&#402;(&zscr;) = `;
+      let inputEquation = generateExpressionInput(lineData.expr, undefined, OPERATORS_IMAG)
+      el.appendChild(inputEquation);
+
+      el = document.createElement("p");
+      let check = document.createElement("input");
+      check.type = "checkbox";
+      check.checked = lineData.C;
+      check.addEventListener("change", () => lineData.C = +check.checked);
+      el.appendChild(check);
+      el.insertAdjacentHTML("beforeend", ` Vary brightness according to distance from origin?`);
+      div.appendChild(el);
+      break;
+    }
     case '~': {
       console.log(lineData)
       if (!lineData.expr) {
@@ -1487,12 +1517,22 @@ function generateLineConfigDiv(graphData, lineData, callback, btnType = 0) {
         lineData.rhs = createNewExpression(graphData, "y");
         lineData.rhs.parse();
       }
+      lineData.C ??= 0.02;
 
       let el = document.createElement("p");
       div.appendChild(el);
       el.appendChild(generateExpressionInput(lineData.lhs));
       el.insertAdjacentHTML("beforeend", " = ");
       el.appendChild(generateExpressionInput(lineData.rhs));
+
+      el = document.createElement("p");
+      div.appendChild(el);
+      el.insertAdjacentHTML("beforeend", "<abbr title='Largest difference between rhs and lhs to plot a point'>&Delta;</abbr> = ");
+      let delta = document.createElement("input");
+      delta.type = "number";
+      delta.value = lineData.C;
+      delta.addEventListener("change", () => lineData.C = +delta.value);
+      el.appendChild(delta);
       break;
     }
     case 'θ': {

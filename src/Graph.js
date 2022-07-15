@@ -141,6 +141,23 @@ export class Graph {
     const xAxisSpan = this.getXAxisSpan();
     const EPSILON = Number.EPSILON;
 
+    let met = false;
+    for (let [id, data] of this._lines) {
+      data.draw ??= true;
+      if (data.draw && data.type === 'z2') {
+        if (!met) {
+          data.error = false;
+          met = true;
+          this.plotComplexField(data);
+        } else {
+          data.error = true;
+          data.emsg = `Can only plot one line '${data.type}'`;
+        }
+      } else if (data.draw && data.type === 'e') {
+        this.plotWhereEqual(data);
+      }
+    }
+
     // x-axis
     xAxis: {
       let y, line;
@@ -287,6 +304,7 @@ export class Graph {
     // lines
     lines: {
       for (let [id, data] of this._lines) {
+        if (data.type === 'z2' || data.type === 'e') continue;
         data.draw ??= true;
         let coords = this.generateCoords(id);
         data.coords = coords;
@@ -505,23 +523,6 @@ export class Graph {
             data.drawAll = true;
             break;
           case 'e': {
-            let D = 0.04;
-            for (let h = 0; h < this.height; h += 1) {
-              for (let w = 0; w < this.width; w += 1) {
-                let [x, y] = this.fromCoordinates(w, h);
-                data.lhs.setSymbol("x", x).setSymbol("y", y);
-                let lhs = data.lhs.evaluate();
-                if (data.expr.error) break;
-                data.rhs.setSymbol("x", x).setSymbol("y", y);
-                let rhs = data.rhs.evaluate();
-                if (data.expr.error) break;
-                if (Math.abs(lhs - rhs) <= D) {
-                  coords.push([x, y]);
-                }
-              }
-              if (data.expr.error) break;
-            }
-            if (data.expr.error) data.emsg = data.expr.handleError();
             break;
           }
           case '~': {
@@ -668,6 +669,79 @@ export class Graph {
       });
     }
     this._ctx.restore();
+  }
+
+  plotComplexField(data) {
+    data.error = false;
+    let outs = []; // [mag, theta][]
+    let maxMag = -1;
+    for (let x = 0; x < this.width; x++) {
+      for (let y = 0; y < this.height; y++) {
+        let idx = x + y * this.width;
+        let [a, b] = this.fromCoordinates(x, y), z = new Complex(a, b);
+        data.expr.setSymbol("z", z);
+        let out = data.expr.evaluate();
+        if (data.expr.error) break;
+        let m = out.getMag(), t = out.getArg();
+        if (m > maxMag) maxMag = m;
+        outs[idx] = [m, t];
+      }
+      if (data.expr.error) break;
+    }
+    if (data.expr.error) {
+      data.error = true;
+      data.emsg = data.expr.handleError();
+      return;
+    }
+    data.coords = outs;
+
+    let img = this._ctx.getImageData(0, 0, this.width, this.height);
+    for (let x = 0; x < this.width; x++) {
+      for (let y = 0; y < this.height; y++) {
+        let idx = 4 * (x + y * this.width);
+        let [mag, theta] = outs[x + y * this.width];
+        let hu = theta < 0 ? 360 + theta / Math.PI * 180 : theta / Math.PI * 180;
+        let bright = data.C ? mag / maxMag * 75 : 50;
+        let rgb = gutils.hsl2rgb(hu, 100, bright);
+        img.data[idx] = rgb[0];
+        img.data[idx + 1] = rgb[1];
+        img.data[idx + 2] = rgb[2];
+        img.data[idx + 3] = 255;
+      }
+    }
+    this._ctx.putImageData(img, 0, 0);
+  }
+
+  plotWhereEqual(data) {
+    const img = this._ctx.getImageData(0, 0, this.width, this.height);
+    data.error = false;
+    data.coords = [];
+    data.C ??= 0.02;
+    for (let sx = 0; sx < this.width; sx++) {
+      for (let sy = 0; sy < this.height; sy++) {
+        let [x, y] = this.fromCoordinates(sx, sy);
+        data.lhs.setSymbol("x", x).setSymbol("y", y);
+        let lhs = data.lhs.evaluate();
+        if (lhs instanceof Complex) lhs = lhs.a;
+        if (data.lhs.error) break;
+        data.rhs.setSymbol("x", x).setSymbol("y", y);
+        let rhs = data.rhs.evaluate();
+        if (rhs instanceof Complex) rhs = rhs.a;
+        if (data.rhs.error) break;
+        if (Math.abs(lhs - rhs) <= data.C) {
+          let idx = 4 * (sx + sy * this.width);
+          img.data[idx] = 0;
+          img.data[idx + 1] = 0;
+          img.data[idx + 2] = 0;
+          img.data[idx + 3] = 255;
+          data.coords.push([x, y]);
+        }
+      }
+      if (data.lhs.error || data.rhs.error) break;
+    }
+    if (data.lhs.error) data.emsg = data.lhs.handleError();
+    if (data.rhs.error) data.emsg = data.rhs.handleError();
+    this._ctx.putImageData(img, 0, 0);
   }
 
   /** Return array of axis-intercepts for the given line at the given axis. An array of coords may be given in place of if. */

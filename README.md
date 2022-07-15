@@ -102,6 +102,7 @@ Each line is an object which contains sketching and aesthetic data.
   - `x` : the x-coordinates are passed into `data.expr` and the output is `y`. Plot `[x, y]`.
   - `y` : the y-coordinates are passed into `data.expr` and the output is `x`. Plot `[x, y]`.
   - `z` : complex. The x-coordinate is passed into `data.expr`, which returns `Complex` z = a + bi. Plots `[x, a]` and `[x, b]` (imaginary plot is partly transparent)
+  - `z2` : complex map. For every point on the complex plane, z=a+bi, produce f(z). At point [a,b], color according to the arg(f(z)).
   - `θ` : polar. `a` varies in `range` and `f(a)` returns `r`, which is plotted as the polar coordinate `[r, a]`.
   - `~` : approximation. Use Taylor approximation to approximate curve `id` around `x=C`.
 
