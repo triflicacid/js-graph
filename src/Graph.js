@@ -146,16 +146,26 @@ export class Graph {
     let met = false;
     for (let [id, data] of this._lines) {
       data.draw ??= true;
-      if (data.draw && data.type === 'z2') {
+      if (!data.draw) continue;
+      if (data.type === 'z2') {
         if (!met) {
           data.error = false;
           met = true;
           this.plotComplexField(data);
         } else {
           data.error = true;
-          data.emsg = `Can only plot one line '${data.type}'`;
+          data.emsg = `Can only plot one line of type 'z2'/'d2'`;
         }
-      } else if (data.draw && data.type === 'e') {
+      } else if (data.type === 'd2') {
+        if (!met) {
+          data.error = false;
+          met = true;
+          this.plotComplexFieldDerivative(data);
+        } else {
+          data.error = true;
+          data.emsg = `Can only plot one line of type 'z2'/'d2'`;
+        }
+      } else if (data.type === 'e') {
         this.plotWhereEqual(data);
       }
     }
@@ -306,7 +316,7 @@ export class Graph {
     // lines
     lines: {
       for (let [id, data] of this._lines) {
-        if (data.type === 'z2' || data.type === 'e') continue;
+        if (data.type === 'z2' || data.type === 'e' || data.type === 'd2') continue;
         data.draw ??= true;
         let coords = this.generateCoords(id);
         data.coords = coords;
@@ -708,6 +718,52 @@ export class Graph {
         let hu = arg < 0 ? 360 + arg / Math.PI * 180 : arg / Math.PI * 180;
         let bright = data.C ? mag / maxMag * 75 : 50;
         let rgb = gutils.hsl2rgb(hu, 100, bright);
+        img.data[idx] = rgb[0];
+        img.data[idx + 1] = rgb[1];
+        img.data[idx + 2] = rgb[2];
+        img.data[idx + 3] = 255;
+      }
+    }
+    this._ctx.putImageData(img, 0, 0);
+  }
+
+  plotComplexFieldDerivative(data) {
+    data.error = false;
+    const outs = [], original = this._lines.get(data.id).coords, w = this.width;
+    for (let i = 0; i < original.length; ++i) {
+      const [zIn, zOut] = original[i];
+      let changes = [], zOther;
+      zOther = original[i - w]; // UP
+      if (zOther) changes.push(Complex.sub(zOther[1], zOut));
+      zOther = original[i - w - 1]; // UP LEFT
+      if (zOther) changes.push(Complex.sub(zOther[1], zOut));
+      zOther = original[i - w + 1]; // UP RIGHT
+      if (zOther) changes.push(Complex.sub(zOther[1], zOut));
+      zOther = original[i + w]; // DOWN
+      if (zOther) changes.push(Complex.sub(zOut, zOther[1]));
+      zOther = original[i + w - 1]; // DOWN LEFT
+      if (zOther) changes.push(Complex.sub(zOut, zOther[1]));
+      zOther = original[i + w + 1]; // DOWN RIGHT
+      if (zOther) changes.push(Complex.sub(zOut, zOther[1]));
+      zOther = original[i - 1]; // LEFT
+      if (zOther) changes.push(Complex.sub(zOther[1], zOut));
+      zOther = original[i + 1]; // RIGHT
+      if (zOther) changes.push(Complex.sub(zOut, zOther[1]));
+      let av = changes[0];
+      for (let j = 0; j < changes.length; j++) av.add(changes[j]);
+      av.a /= changes.length;
+      av.b /= changes.length;
+      outs[i] = [zIn, av];
+    }
+    data.coords = outs;
+
+    let img = this._ctx.getImageData(0, 0, this.width, this.height);
+    for (let x = 0; x < this.width; x++) {
+      for (let y = 0; y < this.height; y++) {
+        let idx = 4 * (x + y * this.width);
+        let [zIn, zOut] = outs[x + y * this.width], arg = zOut.getMag();
+        let hu = arg < 0 ? 360 + arg / Math.PI * 180 : arg / Math.PI * 180;
+        let rgb = gutils.hsl2rgb(hu, 100, 50);
         img.data[idx] = rgb[0];
         img.data[idx + 1] = rgb[1];
         img.data[idx + 2] = rgb[2];

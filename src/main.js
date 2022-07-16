@@ -14,6 +14,7 @@ const LINE_TYPES = {
   'e': 'equation',
   'i': 'integrand',
   'm': 'multiply',
+  'd2': 'complex map differential',
   'p': 'parameter',
   's': 'subtraction',
   't': 'translate',
@@ -31,6 +32,7 @@ const LINE_DESCRIPTIONS = {
   'e': `Equation - sketch when lhs == rhs`,
   'i': `Assuming given line is change in gradient, sketch the original line (anti-'d')`,
   'm': `Multiply coords of given lines together`,
+  'd2': 'Differential of complex plane mapping',
   'p': `The paramater p is varied within a range and passed to function which returns [x,y] coordinate`,
   's': `Subtract coords of given lines from one another`,
   't': `Translate line by scale, shift and rotation`,
@@ -221,7 +223,7 @@ function main() {
   // #region USER CODE
   addLine({
     type: "z2",
-    expr: createNewExpression(graphData, "sin(z)").parse(),
+    expr: createNewExpression(graphData, "z**pi - e").parse(),
   }, graphData);
   // graphData.itemListItems.push({ type: "defint", lineID: 0, a: -0.5, b: 0.5 });
   populateLineAnalysisDiv(analysisOptionsDiv, graphData, 0, itemListContainer);
@@ -2032,35 +2034,50 @@ function populateLineAnalysisDiv(parent, graphData, lineID, itemListContainer) {
   const lineData = graphData.graph.getLine(lineID);
   let input, btn;
 
-  if (lineData.type === 'z2') { // Special
+  if (lineData.type === 'z2' || lineData.type === 'd2') { // Special
     const divGen = document.createElement('div');
-    divGen.appendChild(createButton("Roots", "Find roots of complex map", () => {
-      // TODO: RETURNS FALSE POSITIVES
-      let roots = [], lastB, w = graphData.graph.width;
-      lastB = lineData.coords[0][0].b;
+    if (lineData.type === 'z2') {
+      divGen.appendChild(createButton("Roots", "Find roots of complex map", () => {
+        // TODO: RETURNS FALSE POSITIVES
+        let roots = [], lastB, w = graphData.graph.width;
+        lastB = lineData.coords[0][0].b;
 
-      for (let i = w; i < lineData.coords.length - w; ++i) {
-        const [zIn, zOut] = lineData.coords[i];
-        if (Math.abs(zIn.b - lastB) <= Number.EPSILON) {
-          let zUp = lineData.coords[i - w][1];
-          let zDown = lineData.coords[i + w][1];
-          let zLeft = lineData.coords[i - 1][1];
-          let zRight = lineData.coords[i + 1][1];
-          let zOutMag = zOut.getMag();
-          if (Math.sign(zLeft.getMag() - zOutMag) === -Math.sign(zOutMag - zRight.getMag()) && Math.sign(zUp.getMag() - zOutMag) === -Math.sign(zOutMag - zDown.getMag())) {
-            roots.push(i);
+        console.time();
+        for (let i = w + 1; i < lineData.coords.length - w - 1; ++i) {
+          const [zIn, zOut] = lineData.coords[i];
+          if (Math.abs(zIn.b - lastB) <= Number.EPSILON) {
+            let zUp = lineData.coords[i - w][1];
+            let zUpLeft = lineData.coords[i - w - 1][1];
+            let zUpRight = lineData.coords[i - w + 1][1];
+            let zDown = lineData.coords[i + w][1];
+            let zDownLeft = lineData.coords[i + w - 1][1];
+            let zDownRight = lineData.coords[i + w + 1][1];
+            let zLeft = lineData.coords[i - 1][1];
+            let zRight = lineData.coords[i + 1][1];
+            let zOutMag = zOut.getMag();
+            if (Math.sign(zLeft.getMag() - zOutMag) === -Math.sign(zOutMag - zRight.getMag()) && Math.sign(zUp.getMag() - zOutMag) === -Math.sign(zOutMag - zDown.getMag()) && Math.sign(zUpLeft.getMag() - zOutMag) === -Math.sign(zOutMag - zDownRight.getMag()) && Math.sign(zUpRight.getMag() - zOutMag) === -Math.sign(zOutMag - zDownLeft.getMag())) {
+              roots.push(i);
+            }
           }
+          lastB = zIn.b;
         }
-        lastB = zIn.b;
-      }
+        console.timeEnd();
 
-      graphData.graph.addPoints(roots.map(i => {
-        const z = lineData.coords[i][0];
-        return { lineID, typeID: 6, x: z.a, y: z.b };
+        graphData.graph.addPoints(roots.map(i => {
+          const z = lineData.coords[i][0];
+          return { lineID, typeID: 6, x: z.a, y: z.b };
+        }));
+        // Update canvas
+        graphData.renderParams.caches.points.update = true;
+        graphData.renderParams.update = true;
       }));
-      // Update canvas
-      // graphData.renderParams.caches.line.update = true;
-      graphData.renderParams.caches.points.update = true;
+    }
+
+    divGen.appendChild(createButton("d&zscr;", "Plot differential map", () => {
+      addLine({ type: 'd2', id: lineID }, graphData);
+      lineData.draw = false;
+      populateItemList(itemListContainer, graphData, parent);
+      graphData.renderParams.caches.line.update = true;
       graphData.renderParams.update = true;
     }));
     parent.appendChild(divGen);

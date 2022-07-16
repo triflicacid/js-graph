@@ -93,6 +93,7 @@ Each line is an object which contains sketching and aesthetic data.
   - `a` : addition. The key `ids` contains an array of line IDs to add together.
   - `c` : co-ordinates. Provide array `coords` which is an array of `[x,y]` co-ordinates to plot.
   - `d` : derivative. Sketch the change in gradient of line with ID `id` (must be specified and sketched already).
+  - `d2` : complex map derivative. Generate a complex map of the derivative of a complex function.
   - `e` : equation. Plot co-ordinate where `lhs` = `rhs`.
   - `i` : integrand. Sketch a curve as if `id` is the change in gradient of that function (reverse `m`). The constant `C` is specifide.
   - `m` : multiplication. The key `ids` contains an array of line IDs to multiply together.
