@@ -1,0 +1,23 @@
+{
+  "dependencies": {
+    "http-server": "^14.1.1"
+  },
+  "name": "js-graph",
+  "description": "The `Graph` class takes two arguments: a HTML `<canvas>` to draw to, and an optional HTML element to register events to.",
+  "version": "1.0.0",
+  "main": "src/main.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/triflicacid/js-graph.git"
+  },
+  "author": "Ruben Saunders",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/triflicacid/js-graph/issues"
+  },
+  "homepage": "https://github.com/triflicacid/js-graph#readme"
+}
