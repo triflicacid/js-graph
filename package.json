@@ -1,7 +1,4 @@
 {
-  "dependencies": {
-    "http-server": "^14.1.1"
-  },
   "name": "js-graph",
   "description": "The `Graph` class takes two arguments: a HTML `<canvas>` to draw to, and an optional HTML element to register events to.",
   "version": "1.0.0",

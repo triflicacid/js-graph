@@ -385,6 +385,39 @@ export class Graph {
       let coords = [], inc;
       if (data.emsg === undefined) {
         switch (data.type) {
+          case 'l': {
+            inc = xAxisSpan / ncoords;
+            const a = data.a, b = data.b;
+            if (a >= b) {
+              data.emsg = `Limits must be in strictly increasing order: a < b`;
+              break;
+            }
+            const psi = x => x <= 0 ? 0 : x >= 1 ? 1 : Math.exp(-1 / x), w = x => psi(x) / (psi(x) + psi(1 - x));
+            const step = x => x < a ? 0 : x > b ? 1 : w((x - a) / (b - a));
+            let error = false;
+            for (let j = 0, x = opts.xstart; j <= ncoords; j++, x += inc) {
+              data.expr1.setSymbol("x", x);
+              let y1 = data.expr1.evaluate();
+              if (data.expr1.error) {
+                error = true;
+                data.emsg = data.expr1.handleError();
+                break;
+              }
+              if (y1.b !== undefined) y1 = y1.a;
+              data.expr2.setSymbol("x", x);
+              let y2 = data.expr2.evaluate();
+              if (data.expr2.error) {
+                error = true;
+                data.emsg = data.expr2.handleError();
+                break;
+              }
+              if (y2.b !== undefined) y2 = y2.a;
+              let y = step(1 - x) * y1 + step(x) * y2;
+              if (Graph.validCoordinates(x, y)) coords.push([x, y]);
+            }
+            if (error) break;
+            break;
+          }
           case 'x': { // Control the x-coordinate
             inc = xAxisSpan / ncoords;
             for (let i = 0, x = opts.xstart; i < ncoords; ++i, x += inc) {

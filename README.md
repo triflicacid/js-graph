@@ -1,4 +1,8 @@
 # Graph Sketcher
+Provides an online graph which is able to plot a plethora of line definitions and apply actions such as find roots/intercepts, calculus, transformations etc...
+
+To run, this app requires the use of a web server. Recommended is nodes `http`, npms `http-server`,  pythons `SimpleHTTPServer` of the chrome app `Web Server for Chrome`.
+
 The `Graph` class takes two arguments: a HTML `<canvas>` to draw to, and an optional HTML element to register events to.
 
 ## Properties

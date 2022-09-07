@@ -13,6 +13,7 @@ const LINE_TYPES = {
   'd': 'differentiate',
   'e': 'equation',
   'i': 'integrand',
+  'l': 'link',
   'm': 'multiply',
   'd2': 'complex map differential',
   'p': 'parameter',
@@ -31,6 +32,7 @@ const LINE_DESCRIPTIONS = {
   'd': `Sketch the change in gradient of the given line`,
   'e': `Equation - sketch when lhs == rhs`,
   'i': `Assuming given line is change in gradient, sketch the original line (anti-'d')`,
+  'l': `Link together two unrelated functions in a smooth transition`,
   'm': `Multiply coords of given lines together`,
   'd2': 'Differential of complex plane mapping',
   'p': `The paramater p is varied within a range and passed to function which returns [x,y] coordinate`,
@@ -212,8 +214,8 @@ function main() {
   graphData.baseExpr.constSymbols.set('Re', z => z.a);
   graphData.baseExpr.constSymbols.set('Im', z => z.b);
 
-  graphData.isImag = true;
-  graphData.baseExpr.operators = OPERATORS_IMAG;
+  // graphData.isImag = true;
+  // graphData.baseExpr.operators = OPERATORS_IMAG;
 
   createFunction(graphData, 'frac', ['x'], 'x - floor(x)');
   createFunction(graphData, 'sawtooth', ['x', 'T', 'A', 'P'], 'A * frac(x / T + P)', true);
@@ -222,8 +224,11 @@ function main() {
 
   // #region USER CODE
   addLine({
-    type: "z2",
-    expr: createNewExpression(graphData, "z**pi - e").parse(),
+    type: "l",
+    expr1: createNewExpression(graphData, "e**x").parse(),
+    expr2: createNewExpression(graphData, "cos(x)").parse(),
+    a: -1,
+    b: 1,
   }, graphData);
   // graphData.itemListItems.push({ type: "defint", lineID: 0, a: -0.5, b: 0.5 });
   populateLineAnalysisDiv(analysisOptionsDiv, graphData, 0, itemListContainer);
@@ -1904,8 +1909,49 @@ function generateLineConfigDiv(graphData, lineData, callback, btnType = 0) {
       td.appendChild(btnNew);
       break;
     }
+    case 'l': {
+      // Define function if not defined
+      if (!lineData.expr1) {
+        lineData.expr1 = createNewExpression(graphData, "x**3");
+        lineData.expr1.parse();
+      }
+      if (!lineData.expr2) {
+        lineData.expr2 = createNewExpression(graphData, "x**2");
+        lineData.expr2.parse();
+      }
+      if (lineData.a === undefined) lineData.a = -1;
+      if (lineData.b === undefined) lineData.b = 1;
+
+      let el = document.createElement("p");
+      div.appendChild(el);
+      el.innerHTML = `&#402;<sub>1</sub>(&xscr;) = `;
+      let inputE1 = generateExpressionInput(lineData.expr1);
+      el.appendChild(inputE1);
+      el.insertAdjacentHTML("beforeend", "<br>&xscr;&#8714;(-&infin;,");
+      let inputA = document.createElement("input");
+      inputA.type = "number";
+      inputA.value = lineData.a;
+      inputA.addEventListener("change", () => inputA.value = lineData.a = +inputA.value.trim());
+      el.appendChild(inputA);
+      el.insertAdjacentHTML("beforeend", "]");
+
+      el = document.createElement("p");
+      div.appendChild(el);
+      el.innerHTML = `&#402;<sub>2</sub>(&xscr;) = `;
+      let inputE2 = generateExpressionInput(lineData.expr2);
+      el.appendChild(inputE2);
+      el.insertAdjacentHTML("beforeend", "<br>&xscr;&#8714;[");
+      let inputB = document.createElement("input");
+      inputB.type = "number";
+      inputB.value = lineData.b;
+      inputB.addEventListener("change", () => inputB.value = lineData.b = +inputB.value.trim());
+      el.appendChild(inputB);
+      el.insertAdjacentHTML("beforeend", ", &infin;)");
+
+      break;
+    }
     default:
-      div.innerHTML = `<em><strong>Unknown line type ${lineData.type}</strong></em>`;
+      div.innerHTML = `<p><em><strong>Unknown line type ${lineData.type}</strong></em></p>`;
       return div;
   }
 
