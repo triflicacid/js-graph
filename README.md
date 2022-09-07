@@ -100,6 +100,7 @@ Each line is an object which contains sketching and aesthetic data.
   - `d2` : complex map derivative. Generate a complex map of the derivative of a complex function.
   - `e` : equation. Plot co-ordinate where `lhs` = `rhs`.
   - `i` : integrand. Sketch a curve as if `id` is the change in gradient of that function (reverse `m`). The constant `C` is specifide.
+  - `l` : link. Given functions `f1` and `f2`, creae a smooth function which transitions between the two.
   - `m` : multiplication. The key `ids` contains an array of line IDs to multiply together.
   - `p` : parametric. The paremeter `p` is controlled by `range` and outputs a 2-element array `[x, y]`.
   - `s` : subtraction. The key `ids` contains an array of line IDs to subtract from one another.
